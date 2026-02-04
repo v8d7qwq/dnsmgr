@@ -91,6 +91,7 @@ class Dmonitor extends BaseController
                 'cycle' => input('post.cycle/d'),
                 'timeout' => input('post.timeout/d'),
                 'proxy' => input('post.proxy/d'),
+                'tcp_proxy_id' => input('post.tcp_proxy_id/d', 0),
                 'cdn' => input('post.cdn') == 'true' || input('post.cdn') == '1' ? 1 : 0,
                 'remark' => input('post.remark', null, 'trim'),
                 'recordinfo' => input('post.recordinfo', null, 'trim'),
@@ -106,6 +107,14 @@ class Dmonitor extends BaseController
             }
             if ($task['type'] == 2 && $task['backup_value'] == $task['main_value']) {
                 return json(['code' => -1, 'msg' => '主备地址不能相同']);
+            }
+            if ($task['checktype'] != 1) {
+                $task['tcp_proxy_id'] = 0;
+            } elseif ($task['tcp_proxy_id'] > 0) {
+                $proxy = Db::name('proxy')->where('id', $task['tcp_proxy_id'])->where('active', 1)->find();
+                if (!$proxy) {
+                    return json(['code' => -1, 'msg' => 'TCP代理不存在或未启用']);
+                }
             }
             if (Db::name('dmtask')->where('recordid', $task['recordid'])->find()) {
                 return json(['code' => -1, 'msg' => '当前容灾切换策略已存在']);
@@ -128,6 +137,7 @@ class Dmonitor extends BaseController
                 'cycle' => input('post.cycle/d'),
                 'timeout' => input('post.timeout/d'),
                 'proxy' => input('post.proxy/d'),
+                'tcp_proxy_id' => input('post.tcp_proxy_id/d', 0),
                 'cdn' => input('post.cdn') == 'true' || input('post.cdn') == '1' ? 1 : 0,
                 'remark' => input('post.remark', null, 'trim'),
                 'recordinfo' => input('post.recordinfo', null, 'trim'),
@@ -141,6 +151,14 @@ class Dmonitor extends BaseController
             }
             if ($task['type'] == 2 && $task['backup_value'] == $task['main_value']) {
                 return json(['code' => -1, 'msg' => '主备地址不能相同']);
+            }
+            if ($task['checktype'] != 1) {
+                $task['tcp_proxy_id'] = 0;
+            } elseif ($task['tcp_proxy_id'] > 0) {
+                $proxy = Db::name('proxy')->where('id', $task['tcp_proxy_id'])->where('active', 1)->find();
+                if (!$proxy) {
+                    return json(['code' => -1, 'msg' => 'TCP代理不存在或未启用']);
+                }
             }
             if (Db::name('dmtask')->where('recordid', $task['recordid'])->where('id', '<>', $id)->find()) {
                 return json(['code' => -1, 'msg' => '当前容灾切换策略已存在']);
@@ -197,6 +215,12 @@ class Dmonitor extends BaseController
             $domains[] = ['id'=>$row['id'], 'name'=>$row['name'], 'type'=>$row['type']];
         }
         View::assign('domains', $domains);
+
+        $proxies = [];
+        if (Db::query("SHOW TABLES LIKE '" . config('database.connections.mysql.prefix') . "proxy'")) {
+            $proxies = Db::name('proxy')->where('active', 1)->order('id', 'desc')->field('id,name,proxy_type,proxy_server,proxy_port')->select()->toArray();
+        }
+        View::assign('proxies', $proxies);
 
         View::assign('info', $task);
         View::assign('action', $action);

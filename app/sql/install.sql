@@ -11,6 +11,22 @@ INSERT INTO `dnsmgr_config` VALUES ('notice_wxtpl', '0');
 INSERT INTO `dnsmgr_config` VALUES ('mail_smtp', 'smtp.qq.com');
 INSERT INTO `dnsmgr_config` VALUES ('mail_port', '465');
 
+DROP TABLE IF EXISTS `dnsmgr_proxy`;
+CREATE TABLE `dnsmgr_proxy` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(64) NOT NULL,
+  `proxy_type` varchar(10) NOT NULL DEFAULT 'sock5',
+  `proxy_server` varchar(255) NOT NULL,
+  `proxy_port` int(5) NOT NULL,
+  `proxy_user` varchar(64) DEFAULT NULL,
+  `proxy_pwd` varchar(128) DEFAULT NULL,
+  `remark` varchar(100) DEFAULT NULL,
+  `addtime` int(11) NOT NULL DEFAULT 0,
+  `active` tinyint(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (`id`),
+  KEY `active` (`active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 DROP TABLE IF EXISTS `dnsmgr_account`;
 CREATE TABLE `dnsmgr_account` (
   `id` int(11) unsigned NOT NULL auto_increment,
@@ -100,6 +116,7 @@ CREATE TABLE `dnsmgr_dmtask` (
   `timeout` tinyint(5) NOT NULL DEFAULT 2,
   `remark` varchar(100) DEFAULT NULL,
   `proxy` tinyint(1) NOT NULL DEFAULT 0,
+  `tcp_proxy_id` int(11) NOT NULL DEFAULT 0,
   `cdn` tinyint(1) NOT NULL DEFAULT 0,
   `addtime` int(11) NOT NULL DEFAULT 0,
   `checktime` int(11) NOT NULL DEFAULT 0,

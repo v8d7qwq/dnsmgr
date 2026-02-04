@@ -87,6 +87,16 @@
             <input type="text" name="tcpport" v-model="set.tcpport" placeholder="填写TCP端口号" class="form-control" data-bv-integer="true" min="1" max="65535" required>
         </div>
     </div>
+    <div class="form-group" v-show="set.type<=2&&set.checktype==1">
+        <label class="col-sm-3 control-label no-padding-right">TCP代理</label>
+        <div class="col-sm-6">
+            <select name="tcp_proxy_id" v-model="set.tcp_proxy_id" class="form-control">
+                <option :value="0">无代理</option>
+                <option v-for="p in proxyList" :value="p.id">{{p.name}} ({{p.proxy_type=='sock5h'?'SOCKS5H':'SOCKS5'}} {{p.proxy_server}}:{{p.proxy_port}})</option>
+            </select>
+            <p class="help-block">使用 SOCKS5/SOCKS5H 代理进行 TCP 连通性检测。没有可用代理？<a href="/system/proxylist" target="_blank">去代理管理添加</a></p>
+        </div>
+    </div>
     <div class="form-group" v-show="set.type<=2&&set.checktype==2">
         <label class="col-sm-3 control-label no-padding-right" is-required>检测URL地址</label>
         <div class="col-sm-6">
@@ -155,6 +165,7 @@
 var action = '{$action}';
 var info = {$info|json_encode|raw};
 var domainList = {$domains|json_encode|raw};
+var proxyList = {$proxies|json_encode|raw};
 var support_ping = '{$support_ping}';
 new Vue({
     el: '#app',
@@ -177,10 +188,12 @@ new Vue({
             timeout: 2,
             cycle: 3,
             proxy: 0,
+            tcp_proxy_id: 0,
             cdn: 0,
         },
         dnstype: null,
         domainList: domainList,
+        proxyList: proxyList,
         recordList: [],
         typeList: [
             {value:0, label:'无操作'},

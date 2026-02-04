@@ -45,7 +45,22 @@ class TaskRunner
             if ($row['checktype'] == 2) {
                 $result = CheckUtils::curl($row['checkurl'], $row['timeout'], $row['main_value'], $row['proxy'] == 1);
             } elseif ($row['checktype'] == 1) {
-                $result = CheckUtils::tcp($row['main_value'], $row['checkurl'], $row['tcpport'], $row['timeout']);
+                $tcpProxyId = intval($row['tcp_proxy_id'] ?? 0);
+                if ($tcpProxyId > 0) {
+                    $proxy = $this->db()->name('proxy')->where('id', $tcpProxyId)->where('active', 1)->find();
+                    if ($proxy) {
+                        $target = $row['main_value'];
+                        if (!empty($row['checkurl']) && filter_var($row['checkurl'], FILTER_VALIDATE_IP)) {
+                            $target = $row['checkurl'];
+                        }
+                        $useRemoteDns = ($proxy['proxy_type'] ?? '') == 'sock5h';
+                        $result = CheckUtils::tcpViaSocks5($target, $row['tcpport'], $row['timeout'], $proxy, $useRemoteDns);
+                    } else {
+                        $result = ['status' => false, 'errmsg' => 'TCP代理不存在或未启用', 'usetime' => 0];
+                    }
+                } else {
+                    $result = CheckUtils::tcp($row['main_value'], $row['checkurl'], $row['tcpport'], $row['timeout']);
+                }
             } else {
                 $result = CheckUtils::ping($row['main_value'], $row['checkurl']);
             }

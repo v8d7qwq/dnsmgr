@@ -1,0 +1,179 @@
+{extend name="common/layout" /}
+{block name="title"}代理管理{/block}
+{block name="main"}
+<style>
+    .control-label[is-required]:before {
+        content: "*";
+        color: #f56c6c;
+        margin-right: 4px;
+    }
+</style>
+<div class="row" id="app">
+<div class="col-xs-12 col-sm-8 col-lg-6 center-block" style="float: none;">
+<div class="panel panel-default">
+<div class="panel-heading">
+    <h3 class="panel-title">
+        <a href="/system/proxylist" class="btn btn-sm btn-default pull-right" style="margin-top:-6px"><i class="fa fa-reply fa-fw"></i> 返回</a>
+        {if $action=='edit'}编辑{else}添加{/if}代理
+    </h3>
+</div>
+<div class="panel-body">
+  <form onsubmit="return false" method="post" class="form-horizontal" role="form" id="proxyform">
+    <div class="form-group">
+        <label class="col-sm-3 control-label no-padding-right" is-required>名称</label>
+        <div class="col-sm-9">
+            <input type="text" name="name" v-model="set.name" placeholder="用于下拉展示" class="form-control" required>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-sm-3 control-label no-padding-right" is-required>协议</label>
+        <div class="col-sm-9">
+            <select class="form-control" name="proxy_type" v-model="set.proxy_type" required>
+                <option value="sock5">SOCKS5</option>
+                <option value="sock5h">SOCKS5H（远端解析）</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-sm-3 control-label no-padding-right" is-required>代理IP/域名</label>
+        <div class="col-sm-9">
+            <input type="text" name="proxy_server" v-model="set.proxy_server" placeholder="如：127.0.0.1" class="form-control" required>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-sm-3 control-label no-padding-right" is-required>代理端口</label>
+        <div class="col-sm-9">
+            <input type="number" name="proxy_port" v-model="set.proxy_port" placeholder="如：1080" class="form-control" min="1" max="65535" required>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-sm-3 control-label no-padding-right">账号</label>
+        <div class="col-sm-9">
+            <input type="text" name="proxy_user" v-model="set.proxy_user" placeholder="没有请留空" class="form-control">
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-sm-3 control-label no-padding-right">密码</label>
+        <div class="col-sm-9">
+            <input type="text" name="proxy_pwd" v-model="set.proxy_pwd" placeholder="没有请留空" class="form-control">
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-sm-3 control-label no-padding-right" is-required>启用</label>
+        <div class="col-sm-9">
+            <label class="radio-inline">
+                <input type="radio" name="active" value="1" v-model="set.active"> 是
+            </label>
+            <label class="radio-inline">
+                <input type="radio" name="active" value="0" v-model="set.active"> 否
+            </label>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-sm-3 control-label no-padding-right">备注</label>
+        <div class="col-sm-9">
+            <input type="text" name="remark" v-model="set.remark" placeholder="可留空" class="form-control">
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-sm-offset-3 col-sm-9">
+            <button type="button" class="btn btn-primary" @click="submit">提交</button>
+            <button type="button" class="btn btn-default" @click="testNow">测试连通性</button>
+        </div>
+    </div>
+  </form>
+</div>
+</div>
+</div>
+</div>
+{/block}
+{block name="script"}
+<script src="/static/js/vue-2.7.16.min.js"></script>
+<script src="/static/js/layer/layer.js"></script>
+<script src="/static/js/bootstrapValidator.min.js?v=2"></script>
+<script>
+var action = '{$action}';
+var info = {$info|json_encode|raw};
+new Vue({
+    el: '#app',
+    data: {
+        action: action,
+        set: {
+            id: '',
+            name: '',
+            proxy_type: 'sock5',
+            proxy_server: '',
+            proxy_port: 1080,
+            proxy_user: '',
+            proxy_pwd: '',
+            active: 1,
+            remark: '',
+        }
+    },
+    mounted() {
+        if(this.action == 'edit' && info){
+            Object.keys(info).forEach((key) => {
+                this.$set(this.set, key, info[key])
+            })
+        }
+        $("#proxyform").bootstrapValidator({
+            live: 'submitted',
+        });
+    },
+    methods: {
+        submit(){
+            $("#proxyform").data("bootstrapValidator").validate();
+            if(!$("#proxyform").data("bootstrapValidator").isValid()){
+                return false;
+            }
+            var ii = layer.load(2, {shade:[0.1,'#fff']});
+            $.ajax({
+                type: "POST",
+                url: "",
+                data: this.set,
+                dataType: 'json',
+                success: function(data) {
+                    layer.close(ii);
+                    if(data.code == 0){
+                        layer.alert(data.msg, {icon: 1}, function(){
+                            window.location.href = '/system/proxylist';
+                        });
+                    }else{
+                        layer.alert(data.msg, {icon: 2});
+                    }
+                },
+                error: function(){
+                    layer.close(ii);
+                    layer.msg('服务器错误');
+                }
+            });
+        },
+        testNow(){
+            var host = this.set.proxy_type == 'sock5h' ? 'www.baidu.com' : 'www.baidu.com';
+            var port = 443;
+            var timeout = 3;
+            var ii = layer.load(2, {shade:[0.1,'#fff']});
+            $.ajax({
+                type: 'POST',
+                url: '/system/proxy_pool_test',
+                data: {id: this.set.id || 0, test_host: host, test_port: port, timeout: timeout, _tmp: 1, proxy: this.set},
+                dataType: 'json',
+                success: function(data){
+                    layer.close(ii);
+                    if(data.code == 0){
+                        layer.alert('连接成功，耗时：'+(data.usetime||0)+'ms', {icon:1});
+                    }else{
+                        layer.alert('连接失败：'+data.msg, {icon:2});
+                    }
+                },
+                error: function(){
+                    layer.close(ii);
+                    layer.msg('服务器错误');
+                }
+            });
+        }
+    },
+});
+</script>
+{/block}
+

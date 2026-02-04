@@ -1,0 +1,220 @@
+{extend name="common/layout" /}
+{block name="title"}代理管理{/block}
+{block name="main"}
+<style>
+tbody tr>td:nth-child(4){overflow: hidden;text-overflow: ellipsis;white-space: nowrap;max-width:220px;}
+</style>
+<div class="row">
+	<div class="col-xs-12 center-block" style="float: none;">
+	<div class="panel panel-default panel-intro">
+	<div class="panel-body">
+
+<form onsubmit="return searchSubmit()" method="GET" class="form-inline" id="searchToolbar">
+  <div class="form-group">
+	<label>搜索</label>
+    <input type="text" class="form-control" name="kw" placeholder="名称/IP/备注">
+  </div>
+  <div class="form-group">
+	<select name="active" class="form-control">
+		<option value="">启用状态</option>
+		<option value="1">启用</option>
+		<option value="0">禁用</option>
+	</select>
+  </div>
+  <button type="submit" class="btn btn-primary"><i class="fa fa-search"></i> 搜索</button>
+  <a href="javascript:searchClear()" class="btn btn-default" title="刷新列表"><i class="fa fa-refresh"></i> 刷新</a>
+  <a href="/system/proxy/add" class="btn btn-success"><i class="fa fa-plus"></i> 添加</a>
+  <div class="btn-group" role="group">
+	<button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">批量操作 <span class="caret"></span></button>
+	<ul class="dropdown-menu">
+		<li><a href="javascript:operation('open')">启用</a></li>
+		<li><a href="javascript:operation('close')">禁用</a></li>
+		<li><a href="javascript:operation('delete')">删除</a></li>
+	</ul>
+  </div>
+</form>
+
+      <table id="listTable"></table>
+    </div>
+  </div>
+</div>
+</div>
+{/block}
+{block name="script"}
+<script src="/static/js/layer/layer.js"></script>
+<script src="/static/js/bootstrap-table-1.21.4.min.js"></script>
+<script src="/static/js/bootstrap-table-page-jump-to-1.21.4.min.js"></script>
+<script src="/static/js/custom.js"></script>
+<script>
+$(document).ready(function(){
+	updateToolbar();
+	const defaultPageSize = 15;
+	const pageNumber = typeof window.$_GET['pageNumber'] != 'undefined' ? parseInt(window.$_GET['pageNumber']) : 1;
+	const pageSize = typeof window.$_GET['pageSize'] != 'undefined' ? parseInt(window.$_GET['pageSize']) : defaultPageSize;
+
+	$("#listTable").bootstrapTable({
+		url: '/system/proxy/data',
+		pageNumber: pageNumber,
+		pageSize: pageSize,
+		classes: 'table table-striped table-hover table-bordered',
+		columns: [
+			{ field: '', checkbox: true },
+			{ field: 'id', title: 'ID' },
+			{ field: 'name', title: '名称' },
+			{ field: 'proxy_type', title: '协议', formatter: function(value){
+				if(value == 'sock5h') return '<span class="label bg-purple">SOCKS5H</span>';
+				return '<span class="label bg-aqua">SOCKS5</span>';
+			}},
+			{ field: 'proxy_addr', title: '地址' },
+			{ field: 'active', title: '启用', formatter: function(value, row){
+				if(value == 1){
+					return '<div class="material-switch"><input id="active'+row.id+'" type="checkbox" checked onchange="setActive('+row.id+',0)"/><label for="active'+row.id+'" class="label-primary"></label></div>';
+				}else{
+					return '<div class="material-switch"><input id="active'+row.id+'" type="checkbox" onchange="setActive('+row.id+',1)"/><label for="active'+row.id+'" class="label-primary"></label></div>';
+				}
+			}},
+			{ field: 'remark', title: '备注', visible: false },
+			{ field: 'addtimestr', title: '添加时间', visible: false },
+			{ field: 'action', title: '操作', formatter: function(value, row){
+				var html = `<a href="javascript:;" onclick='testItem(${row.id}, ${JSON.stringify(row.proxy_type || '')})' class="btn btn-info btn-xs">测试</a>&nbsp;&nbsp;`;
+				html += '<a href="/system/proxy/edit?id='+row.id+'" class="btn btn-primary btn-xs">修改</a>&nbsp;&nbsp;';
+				html += '<a href="javascript:delItem('+row.id+')" class="btn btn-danger btn-xs">删除</a>';
+				return html;
+			}},
+		],
+		onLoadSuccess: function() {
+			$('[data-toggle="tooltip"]').tooltip()
+		}
+	})
+})
+
+function setActive(id, active){
+	$.post('/system/proxy/setactive', {id: id, active: active}, function(data){
+		if(data.code == 0) {
+			layer.msg('修改成功', {icon: 1, time:800});
+			searchRefresh();
+		} else {
+			layer.msg(data.msg, {icon: 2});
+		}
+	}, 'json');
+}
+
+function delItem(id){
+	layer.confirm('确定要删除此代理吗？', {title: '提示', icon: 0}, function(){
+		$.post('/system/proxy/del', {id: id}, function(data){
+			if(data.code == 0) {
+				layer.msg('删除成功', {icon: 1, time:800});
+				searchRefresh();
+			} else {
+				layer.alert(data.msg, {icon: 2});
+			}
+		}, 'json');
+	});
+}
+
+function testItem(id, proxyType){
+	// 国内服务器测试目标：优先使用国内常见站点域名
+	var defaultHost = proxyType == 'sock5h' ? 'www.baidu.com' : 'www.baidu.com';
+	var defaultPort = 443;
+	var html = ''
+		+ '<div style="padding:10px 10px 0 10px">'
+		+ '  <div class="form-group">'
+		+ '    <label>目标地址</label>'
+		+ '    <input type="text" class="form-control" id="test_host" value="'+defaultHost+'" placeholder="如：www.baidu.com 或 1.1.1.1">'
+		+ '  </div>'
+		+ '  <div class="form-group">'
+		+ '    <label>端口</label>'
+		+ '    <input type="number" class="form-control" id="test_port" value="'+defaultPort+'" min="1" max="65535">'
+		+ '  </div>'
+		+ '  <div class="form-group">'
+		+ '    <label>超时(秒)</label>'
+		+ '    <input type="number" class="form-control" id="test_timeout" value="3" min="1" max="30">'
+		+ '  </div>'
+		+ '  <div class="form-group">'
+		+ '    <a class="btn btn-default btn-xs" href="javascript:;" data-host="www.baidu.com" onclick="fillTarget(this.dataset.host,443)">www.baidu.com:443</a> '
+		+ '    <a class="btn btn-default btn-xs" href="javascript:;" data-host="www.qq.com" onclick="fillTarget(this.dataset.host,443)">www.qq.com:443</a>'
+		+ '    <p class="help-block">测试为 SOCKS5 握手 + CONNECT 目标。SOCKS5H 建议优先测试域名目标以验证远端解析。</p>'
+		+ '  </div>'
+		+ '</div>';
+
+	layer.open({
+		type: 1,
+		title: '测试代理连通性',
+		area: ['420px', '420px'],
+		content: html,
+		btn: ['开始测试', '取消'],
+		yes: function(index){
+			var host = $('#test_host').val();
+			var port = parseInt($('#test_port').val());
+			var timeout = parseInt($('#test_timeout').val());
+			if(!host || !port){
+				layer.msg('目标地址和端口不能为空'); return;
+			}
+			var ii = layer.load(2);
+			$.ajax({
+				type: 'POST',
+				url: '/system/proxy_pool_test',
+				data: {id: id, test_host: host, test_port: port, timeout: timeout},
+				dataType: 'json',
+				success: function(data){
+					layer.close(ii);
+					if(data.code == 0){
+						layer.alert('连接成功，耗时：'+(data.usetime||0)+'ms', {icon:1});
+					}else{
+						layer.alert('连接失败：'+data.msg+(typeof data.usetime!='undefined' ? ('<br/>耗时：'+data.usetime+'ms') : ''), {icon:2});
+					}
+				},
+				error: function(){
+					layer.close(ii);
+					layer.msg('服务器错误');
+				}
+			});
+		}
+	});
+}
+
+function fillTarget(host, port){
+	$('#test_host').val(host);
+	$('#test_port').val(port);
+}
+
+function operation(action){
+	var rows = $("#listTable").bootstrapTable('getSelections');
+	if(rows.length == 0){
+		layer.msg('请选择要操作的代理');
+		return;
+	}
+	var ids = [];
+	for(var i in rows){
+		ids.push(rows[i].id);
+	}
+	if(action == 'delete'){
+		if(!confirm('确定要删除所选代理吗？')) return;
+	}
+	var active = null;
+	if(action == 'open') active = 1;
+	if(action == 'close') active = 0;
+
+	var ii = layer.load(2);
+	var done = 0;
+	var fail = 0;
+	function next(){
+		if(ids.length == 0){
+			layer.close(ii);
+			layer.alert('成功操作'+done+'条，失败'+fail+'条', {icon:1});
+			searchRefresh();
+			return;
+		}
+		var id = ids.shift();
+		var url = action == 'delete' ? '/system/proxy/del' : '/system/proxy/setactive';
+		var data = action == 'delete' ? {id:id} : {id:id, active:active};
+		$.post(url, data, function(res){
+			if(res && res.code == 0) done++; else fail++;
+			next();
+		}, 'json').fail(function(){ fail++; next(); });
+	}
+	next();
+}
+</script>
+{/block}
+

@@ -123,6 +123,11 @@ Route::group(function () {
     Route::get('/system/loginset', 'system/loginset');
     Route::get('/system/noticeset', 'system/noticeset');
     Route::get('/system/proxyset', 'system/proxyset');
+    Route::get('/system/proxylist', 'system/proxylist');
+    Route::post('/system/proxy/data', 'system/proxy_data');
+    Route::post('/system/proxy_pool_test', 'system/proxy_pool_test');
+    Route::post('/system/proxy/:action', 'system/proxy_op');
+    Route::get('/system/proxy/:action', 'system/proxyform');
     Route::post('/system/set', 'system/set');
     Route::get('/system/mailtest', 'system/mailtest');
     Route::get('/system/tgbottest', 'system/tgbottest');

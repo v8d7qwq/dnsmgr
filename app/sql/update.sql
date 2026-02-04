@@ -4,6 +4,21 @@ CREATE TABLE IF NOT EXISTS `dnsmgr_config` (
   PRIMARY KEY (`key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS `dnsmgr_proxy` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(64) NOT NULL,
+  `proxy_type` varchar(10) NOT NULL DEFAULT 'sock5',
+  `proxy_server` varchar(255) NOT NULL,
+  `proxy_port` int(5) NOT NULL,
+  `proxy_user` varchar(64) DEFAULT NULL,
+  `proxy_pwd` varchar(128) DEFAULT NULL,
+  `remark` varchar(100) DEFAULT NULL,
+  `addtime` int(11) NOT NULL DEFAULT 0,
+  `active` tinyint(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (`id`),
+  KEY `active` (`active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS `dnsmgr_dmtask` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `did` int(11) unsigned NOT NULL,
@@ -66,6 +81,9 @@ ADD COLUMN `remark` varchar(100) DEFAULT NULL;
 
 ALTER TABLE `dnsmgr_dmtask`
 ADD COLUMN `proxy` tinyint(1) NOT NULL DEFAULT 0;
+
+ALTER TABLE `dnsmgr_dmtask`
+ADD COLUMN `tcp_proxy_id` int(11) NOT NULL DEFAULT 0;
 
 ALTER TABLE `dnsmgr_user`
 ADD COLUMN `totp_open` tinyint(1) NOT NULL DEFAULT '0',

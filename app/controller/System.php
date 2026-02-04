@@ -4,6 +4,7 @@ namespace app\controller;
 
 use app\BaseController;
 use Exception;
+use app\utils\CheckUtils;
 use think\facade\Db;
 use think\facade\View;
 use think\facade\Cache;
@@ -48,6 +49,160 @@ class System extends BaseController
     {
         if (!checkPermission(2)) return $this->alert('error', '无权限');
         return View::fetch();
+    }
+
+    public function proxylist()
+    {
+        if (!checkPermission(2)) return $this->alert('error', '无权限');
+        return View::fetch();
+    }
+
+    public function proxy_data()
+    {
+        if (!checkPermission(2)) return json(['total' => 0, 'rows' => []]);
+        $kw = input('post.kw', null, 'trim');
+        $active = input('post.active', null);
+        $offset = input('post.offset/d', 0);
+        $limit = input('post.limit/d', 15);
+
+        $select = Db::name('proxy');
+        if (!empty($kw)) {
+            $select->whereLike('name|proxy_server|remark', '%' . $kw . '%');
+        }
+        if (!isNullOrEmpty($active)) {
+            $select->where('active', intval($active));
+        }
+        $total = $select->count();
+        $rows = $select->order('id', 'desc')->limit($offset, $limit)->select()->toArray();
+        foreach ($rows as &$row) {
+            $row['addtimestr'] = !empty($row['addtime']) ? date('Y-m-d H:i:s', intval($row['addtime'])) : '';
+            $row['proxy_addr'] = $row['proxy_server'] . ':' . $row['proxy_port'];
+        }
+        return json(['total' => $total, 'rows' => $rows]);
+    }
+
+    public function proxyform()
+    {
+        if (!checkPermission(2)) return $this->alert('error', '无权限');
+        $action = input('param.action');
+        $info = null;
+        if ($action == 'edit') {
+            $id = input('get.id/d');
+            $info = Db::name('proxy')->where('id', $id)->find();
+            if (empty($info)) return $this->alert('error', '代理不存在');
+        }
+        View::assign('info', $info);
+        View::assign('action', $action);
+        return View::fetch();
+    }
+
+    public function proxy_op()
+    {
+        if (!checkPermission(2)) return $this->alert('error', '无权限');
+        $action = input('param.action');
+
+        if ($action == 'add') {
+            $task = [
+                'name' => input('post.name', null, 'trim'),
+                'proxy_type' => input('post.proxy_type', 'sock5', 'trim'),
+                'proxy_server' => input('post.proxy_server', null, 'trim'),
+                'proxy_port' => input('post.proxy_port/d'),
+                'proxy_user' => input('post.proxy_user', null, 'trim'),
+                'proxy_pwd' => input('post.proxy_pwd', null, 'trim'),
+                'remark' => input('post.remark', null, 'trim'),
+                'active' => input('post.active/d', 1),
+                'addtime' => time(),
+            ];
+            if (empty($task['name']) || empty($task['proxy_server']) || empty($task['proxy_port'])) {
+                return json(['code' => -1, 'msg' => '必填项不能为空']);
+            }
+            if ($task['proxy_type'] != 'sock5' && $task['proxy_type'] != 'sock5h') {
+                return json(['code' => -1, 'msg' => '代理协议不支持']);
+            }
+            if (Db::name('proxy')->where('name', $task['name'])->find()) {
+                return json(['code' => -1, 'msg' => '代理名称已存在']);
+            }
+            Db::name('proxy')->insert($task);
+            return json(['code' => 0, 'msg' => '添加成功']);
+        } elseif ($action == 'edit') {
+            $id = input('post.id/d');
+            $row = Db::name('proxy')->where('id', $id)->find();
+            if (!$row) return json(['code' => -1, 'msg' => '代理不存在']);
+
+            $task = [
+                'name' => input('post.name', null, 'trim'),
+                'proxy_type' => input('post.proxy_type', 'sock5', 'trim'),
+                'proxy_server' => input('post.proxy_server', null, 'trim'),
+                'proxy_port' => input('post.proxy_port/d'),
+                'proxy_user' => input('post.proxy_user', null, 'trim'),
+                'proxy_pwd' => input('post.proxy_pwd', null, 'trim'),
+                'remark' => input('post.remark', null, 'trim'),
+                'active' => input('post.active/d', 1),
+            ];
+            if (empty($task['name']) || empty($task['proxy_server']) || empty($task['proxy_port'])) {
+                return json(['code' => -1, 'msg' => '必填项不能为空']);
+            }
+            if ($task['proxy_type'] != 'sock5' && $task['proxy_type'] != 'sock5h') {
+                return json(['code' => -1, 'msg' => '代理协议不支持']);
+            }
+            if (Db::name('proxy')->where('name', $task['name'])->where('id', '<>', $id)->find()) {
+                return json(['code' => -1, 'msg' => '代理名称已存在']);
+            }
+            Db::name('proxy')->where('id', $id)->update($task);
+            return json(['code' => 0, 'msg' => '修改成功']);
+        } elseif ($action == 'setactive') {
+            $id = input('post.id/d');
+            $active = input('post.active/d', 0);
+            Db::name('proxy')->where('id', $id)->update(['active' => $active]);
+            return json(['code' => 0, 'msg' => '设置成功']);
+        } elseif ($action == 'del') {
+            $id = input('post.id/d');
+            Db::name('proxy')->where('id', $id)->delete();
+            return json(['code' => 0, 'msg' => '删除成功']);
+        } else {
+            return json(['code' => -1, 'msg' => '参数错误']);
+        }
+    }
+
+    public function proxy_pool_test()
+    {
+        if (!checkPermission(2)) return $this->alert('error', '无权限');
+        $id = input('post.id/d');
+        $test_host = input('post.test_host', null, 'trim');
+        $test_port = input('post.test_port/d', 443);
+        $timeout = input('post.timeout/d', 3);
+        if (empty($test_host) || empty($test_port)) {
+            return json(['code' => -1, 'msg' => '参数不能为空']);
+        }
+        if ($timeout < 1) $timeout = 1;
+        if ($timeout > 30) $timeout = 30;
+
+        if (!empty($id)) {
+            $proxy = Db::name('proxy')->where('id', $id)->find();
+            if (empty($proxy)) return json(['code' => -1, 'msg' => '代理不存在']);
+            if (intval($proxy['active']) != 1) return json(['code' => -1, 'msg' => '代理未启用']);
+        } else {
+            $proxy = input('post.proxy');
+            if (!is_array($proxy)) return json(['code' => -1, 'msg' => '代理参数错误']);
+            $proxy = [
+                'proxy_type' => $proxy['proxy_type'] ?? 'sock5',
+                'proxy_server' => trim($proxy['proxy_server'] ?? ''),
+                'proxy_port' => intval($proxy['proxy_port'] ?? 0),
+                'proxy_user' => trim($proxy['proxy_user'] ?? ''),
+                'proxy_pwd' => trim($proxy['proxy_pwd'] ?? ''),
+                'active' => 1,
+            ];
+            if (empty($proxy['proxy_server']) || empty($proxy['proxy_port'])) {
+                return json(['code' => -1, 'msg' => '代理服务器和端口不能为空']);
+            }
+        }
+
+        $useRemoteDns = $proxy['proxy_type'] == 'sock5h';
+        $result = CheckUtils::tcpViaSocks5($test_host, $test_port, $timeout, $proxy, $useRemoteDns);
+        if ($result['status']) {
+            return json(['code' => 0, 'msg' => '连接成功', 'usetime' => $result['usetime']]);
+        }
+        return json(['code' => -1, 'msg' => $result['errmsg'] ?: '连接失败', 'usetime' => $result['usetime']]);
     }
 
     public function mailtest()
@@ -95,12 +250,11 @@ class System extends BaseController
     public function proxytest()
     {
         if (!checkPermission(2)) return $this->alert('error', '无权限');
-        $proxy_server = input('post.proxy_server', '', 'trim');
-        $proxy_port = input('post.proxy_port/d', 0);
-        $proxy_user = input('post.proxy_user', '', 'trim');
-        $proxy_pwd = input('post.proxy_pwd', '', 'trim');
-        $proxy_type = input('post.proxy_type', 'http', 'trim');
-        
+        $proxy_server = trim($_POST['proxy_server']);
+        $proxy_port = $_POST['proxy_port'];
+        $proxy_user = trim($_POST['proxy_user']);
+        $proxy_pwd = trim($_POST['proxy_pwd']);
+        $proxy_type = $_POST['proxy_type'];
         try {
             check_proxy('https://dl.amh.sh/ip.htm', $proxy_server, $proxy_port, $proxy_type, $proxy_user, $proxy_pwd);
         } catch (Exception $e) {
