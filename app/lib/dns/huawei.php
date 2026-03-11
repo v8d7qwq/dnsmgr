@@ -79,7 +79,6 @@ class huawei implements DnsInterface
             foreach ($data['recordsets'] as $row) {
                 $name = substr($row['name'], 0, -(strlen($row['zone_name']) + 1));
                 if ($name == '') $name = '@';
-                if ($row['type'] == 'MX') list($row['mx'], $row['records']) = explode(' ', $row['records'][0]);
                 $list[] = [
                     'RecordId' => $row['id'],
                     'Domain' => rtrim($row['zone_name'], '.'),
@@ -113,7 +112,6 @@ class huawei implements DnsInterface
         if ($data) {
             $name = substr($data['name'], 0, -(strlen($data['zone_name']) + 1));
             if ($name == '') $name = '@';
-            if ($data['type'] == 'MX') list($data['mx'], $data['records']) = explode(' ', $data['records'][0]);
             return [
                 'RecordId' => $data['id'],
                 'Domain' => rtrim($data['zone_name'], '.'),
@@ -139,7 +137,6 @@ class huawei implements DnsInterface
         if ($Type == 'TXT' && substr($Value, 0, 1) != '"') $Value = '"' . $Value . '"';
         $records = array_reverse(explode(',', $Value));
         $params = ['name' => $Name, 'type' => $this->convertType($Type), 'records' => $records, 'line' => $Line, 'ttl' => intval($TTL), 'description' => $Remark];
-        if ($Type == 'MX') $params['records'][0] = intval($MX) . ' ' . $Value;
         if ($Weight > 0) $params['weight'] = intval($Weight);
         $data = $this->send_request('POST', '/v2.1/zones/'.$this->domainid.'/recordsets', null, $params);
         return is_array($data) ? $data['id'] : false;
@@ -152,7 +149,6 @@ class huawei implements DnsInterface
         if ($Type == 'TXT' && substr($Value, 0, 1) != '"') $Value = '"' . $Value . '"';
         $records = array_reverse(explode(',', $Value));
         $params = ['name' => $Name, 'type' => $this->convertType($Type), 'records' => $records, 'line' => $Line, 'ttl' => intval($TTL), 'description' => $Remark];
-        if ($Type == 'MX') $params['records'][0] = intval($MX) . ' ' . $Value;
         if ($Weight > 0) $params['weight'] = intval($Weight);
         $data = $this->send_request('PUT', '/v2.1/zones/'.$this->domainid.'/recordsets/'.$RecordId, null, $params);
         return is_array($data);

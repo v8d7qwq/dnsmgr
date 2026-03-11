@@ -95,6 +95,7 @@ new Vue({
 		},
 		async getDomainList(){
 			this.domainList = [];
+			this.page = 1;
 			while(true){
 				try{
 					layer.msg('正在获取第'+this.page+'页域名', {icon: 16, shade: 0.01});

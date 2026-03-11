@@ -505,9 +505,12 @@ class Cert extends BaseController
             $mainDomain = getMainDomain($domain);
             $drow = Db::name('domain')->where('name', $mainDomain)->find();
             if (!$drow) {
-                if (substr($domain, 0, 2) == '*.') $domain = substr($domain, 2);
-                if (!$cname || !Db::name('cert_cname')->where('domain', $domain)->where('status', 1)->find()) {
-                    return ['code' => -1, 'msg' => '域名' . $domain . '未在本系统添加'];
+                $drow = Db::name('domain_alias')->alias('A')->join('domain B', 'A.did = B.id')->where('A.name', $mainDomain)->find();
+                if (!$drow) {
+                    if (substr($domain, 0, 2) == '*.') $domain = substr($domain, 2);
+                    if (!$cname || !Db::name('cert_cname')->where('domain', $domain)->where('status', 1)->find()) {
+                        return ['code' => -1, 'msg' => '域名' . $domain . '未在本系统添加'];
+                    }
                 }
             }
         }

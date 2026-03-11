@@ -305,6 +305,7 @@ class Domain extends BaseController
             if (!checkPermission(2)) return $this->alert('error', '无权限');
             $id = input('post.id/d');
             Db::name('domain')->where('id', $id)->delete();
+            Db::name('domain_alias')->where('did', $id)->delete();
             Db::name('dmtask')->where('did', $id)->delete();
             Db::name('optimizeip')->where('did', $id)->delete();
             Db::name('sctask')->where('did', $id)->delete();
@@ -1106,7 +1107,87 @@ class Domain extends BaseController
 
         $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
         $domainRecords = $dns->getWeightSubDomains($page, $limit, $keyword);
+        if (!$domainRecords) return json(['total' => 0, 'rows' => []]);
         return json(['total' => $domainRecords['total'], 'rows' => $domainRecords['list']]);
+    }
+    
+    public function alias()
+    {
+        $id = input('param.id/d');
+        $drow = Db::name('domain')->where('id', $id)->find();
+        if (!$drow) {
+            return $this->alert('error', '域名不存在');
+        }
+        if (!checkPermission(0, $drow['name'])) return $this->alert('error', '无权限');
+        if (request()->isAjax()) {
+            $act = input('param.act');
+            if ($act == 'add') {
+                $alias = input('post.alias', null, 'trim');
+                if (empty($alias)) {
+                    return json(['code' => -1, 'msg' => '参数不能为空']);
+                }
+                $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
+                if ($dns->addDomainAlias($alias)) {
+                    return json(['code' => 0, 'msg' => '添加域名别名成功']);
+                } else {
+                    return json(['code' => -1, 'msg' => '添加域名别名失败，' . $dns->getError()]);
+                }
+            } elseif ($act == 'delete') {
+                $alias_id = input('post.alias_id/d');
+                if (empty($alias_id)) {
+                    return json(['code' => -1, 'msg' => '参数不能为空']);
+                }
+                $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
+                if ($dns->deleteDomainAlias($alias_id)) {
+                    return json(['code' => 0, 'msg' => '删除域名别名成功']);
+                } else {
+                    return json(['code' => -1, 'msg' => '删除域名别名失败，' . $dns->getError()]);
+                }
+            }
+        }
+
+        $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
+        $domainAliasList = $dns->domainAliasList();
+        if ($domainAliasList === false) $domainAliasList = [];
+
+        $this->updateAliasList($id, $domainAliasList);
+
+        View::assign('domainId', $id);
+        View::assign('domainName', $drow['name']);
+        View::assign('domainAliasList', $domainAliasList);
+        return view();
+    }
+
+    private function updateAliasList($id, $domainAliasList)
+    {
+        $domainAliases = array_column($domainAliasList, 'DomainAlias');
+        $addList = [];
+        $deleteList = [];
+        $existList = Db::name('domain_alias')->where('did', $id)->select()->toArray();
+        $existAliases = array_column($existList, 'name');
+        foreach ($existList as $item) {
+            if (!in_array($item['name'], $domainAliases)) {
+                $deleteList[] = $item['id'];
+            }
+        }
+        foreach ($domainAliases as $item) {
+            if (!in_array($item, $existAliases)) {
+                $addList[] = $item;
+            }
+        }
+        if (!empty($deleteList)) {
+            Db::name('domain_alias')->where('id', 'in', $deleteList)->delete();
+        }
+        if (!empty($addList)) {
+            $dataList = [];
+            foreach ($addList as $item) {
+                $dataList[] = [
+                    'did' => $id,
+                    'name' => $item,
+                ];
+            }
+            Db::name('domain_alias')->insertAll($dataList);
+        }
     }
 
     public function expire_notice()

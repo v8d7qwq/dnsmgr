@@ -74,6 +74,7 @@ Route::group(function () {
     Route::post('/record/list', 'domain/record_list');
     Route::post('/record/weight/data/:id', 'domain/weight_data');
     Route::any('/record/weight/:id', 'domain/weight');
+    Route::any('/record/alias/:id', 'domain/alias');
     Route::get('/record/:id', 'domain/record');
 
     Route::get('/dmonitor/overview', 'dmonitor/overview');

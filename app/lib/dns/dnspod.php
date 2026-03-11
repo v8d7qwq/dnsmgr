@@ -327,6 +327,44 @@ class dnspod implements DnsInterface
         return false;
     }
 
+    //域名别名列表
+    public function domainAliasList()
+    {
+        $action = 'DescribeDomainAliasList';
+        $param = [
+            'Domain' => $this->domain,
+        ];
+        $data = $this->send_request($action, $param);
+        if ($data) {
+            return $data['DomainAliasList'];
+        }
+        return false;
+    }
+
+    //添加域名别名
+    public function addDomainAlias($alias)
+    {
+        $action = 'CreateDomainAlias';
+        $param = [
+            'Domain' => $this->domain,
+            'DomainAlias' => $alias,
+        ];
+        $data = $this->send_request($action, $param);
+        return is_array($data);
+    }
+
+    //删除域名别名
+    public function deleteDomainAlias($id)
+    {
+        $action = 'DeleteDomainAlias';
+        $param = [
+            'Domain' => $this->domain,
+            'DomainAliasId' => $id,
+        ];
+        $data = $this->send_request($action, $param);
+        return is_array($data);
+    }
+
     private function convertLineCode($line)
     {
         $convert_dict = ['default' => '0', 'unicom' => '10=1', 'telecom' => '10=0', 'mobile' => '10=3', 'edu' => '10=2', 'oversea' => '3=0', 'btvn' => '10=22', 'search' => '80=0', 'internal' => '7=0'];

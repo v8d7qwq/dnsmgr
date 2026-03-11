@@ -5,7 +5,7 @@ CREATE TABLE `dnsmgr_config` (
   PRIMARY KEY (`key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO `dnsmgr_config` VALUES ('version', '1045');
+INSERT INTO `dnsmgr_config` VALUES ('version', '1048');
 INSERT INTO `dnsmgr_config` VALUES ('notice_mail', '0');
 INSERT INTO `dnsmgr_config` VALUES ('notice_wxtpl', '0');
 INSERT INTO `dnsmgr_config` VALUES ('mail_smtp', 'smtp.qq.com');
@@ -268,4 +268,14 @@ CREATE TABLE `dnsmgr_sctask` (
   `remark` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `did` (`did`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+DROP TABLE IF EXISTS `dnsmgr_domain_alias`;
+CREATE TABLE `dnsmgr_domain_alias` (
+  `id` int(11) unsigned NOT NULL auto_increment,
+  `did` int(11) unsigned NOT NULL,
+  `name` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `did` (`did`),
+  KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -302,10 +302,12 @@ function getMainDomain($host)
     $domains = config('temp.domains');
     if (!$domains) {
         $domains = Db::name('domain')->column('name');
+        $domains_alias = Db::name('domain_alias')->column('name');
+        $domains = array_merge($domains, $domains_alias);
         config(['domains'=>$domains], 'temp');
     }
     foreach ($domains as $domain) {
-        if (str_ends_with($host, $domain)) {
+        if ($host === $domain || str_ends_with($host, '.' . $domain)) {
             return $domain;
         }
     }

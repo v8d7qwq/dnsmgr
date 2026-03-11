@@ -99,7 +99,7 @@ class CertDeployService
         if (!empty($error) && strlen($error) > 300) {
             $error = mb_strcut($error, 0, 300);
         }
-        $update = ['status' => $status, 'error' => $error, 'retrytime' => $retrytime];
+        $update = ['status' => $status, 'error' => $error ? str_replace(["\r", "\n"], '', $error) : null, 'retrytime' => $retrytime];
         if ($status == 1){
             $update['retry'] = 0;
             $update['lasttime'] = date('Y-m-d H:i:s');

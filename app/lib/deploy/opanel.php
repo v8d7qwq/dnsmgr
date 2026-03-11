@@ -144,7 +144,7 @@ class opanel implements DeployInterface
         $domains = $config['domainList'];
         if (empty($domains)) throw new Exception('没有设置要部署的域名');
 
-        $params = ['page' => 1, 'pageSize' => 500];
+        $params = ['page' => 1, 'pageSize' => 500, 'orderBy' => 'expire_date', 'order' => 'null'];
         try {
             $data = $this->request("/websites/ssl/search", $params, $nodeName);
             $logMsg = $nodeName ? "节点 [{$nodeName}] " : "";

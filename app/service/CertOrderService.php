@@ -22,6 +22,7 @@ class CertOrderService
     private $dnsList;
     private $domainList;
     private $cnameDomainList = [];
+    private $domainsAliasList = [];
 
     // 订单状态：0:待提交 1:待验证 2:正在验证 3:已签发 4:已吊销 -1:购买证书失败 -2:创建订单失败 -3:添加DNS失败 -4:验证DNS失败 -5:验证订单失败 -6:订单验证未通过 -7:签发证书失败
     public function __construct($oid)
@@ -71,6 +72,12 @@ class CertOrderService
             $drow = Db::name('domain')->where('name', $mainDomain)->find();
             if (!$drow && preg_match('/^xn--/', $mainDomain)) {
                 $drow = Db::name('domain')->where('name', idn_to_utf8($mainDomain))->find();
+            }
+            if (!$drow) {
+                $drow = Db::name('domain_alias')->alias('A')->join('domain B', 'A.did = B.id')->where('A.name', $mainDomain)->field('A.name as alias,B.name as maindomain')->find();
+                if ($drow) {
+                    $this->domainsAliasList[$drow['alias']] = $drow['maindomain'];
+                }
             }
             if (!$drow) {
                 if (substr($domain, 0, 2) == '*.') $domain = substr($domain, 2);
@@ -181,7 +188,7 @@ class CertOrderService
         if (!empty($error) && strlen($error) > 300) {
             $error = mb_strcut($error, 0, 300);
         }
-        $update = ['status' => $status, 'error' => $error, 'updatetime' => date('Y-m-d H:i:s'), 'retrytime' => $retrytime];
+        $update = ['status' => $status, 'error' => $error ? str_replace(["\r", "\n"], '', $error) : null, 'updatetime' => date('Y-m-d H:i:s'), 'retrytime' => $retrytime];
         $res = Db::name('cert_order')->where('id', $this->order['id'])->data($update);
         if ($status < 0 || $retrytime) {
             $this->order['retry']++;
@@ -261,6 +268,18 @@ class CertOrderService
             $this->saveResult(-2, $e->getMessage());
             throw $e;
         }
+
+        foreach ($this->domainsAliasList as $alias => $mainDomain) {
+            if (isset($this->dnsList[$alias])) {
+                if (!isset($this->dnsList[$mainDomain])) {
+                    $this->dnsList[$mainDomain] = $this->dnsList[$alias];
+                } else {
+                    $this->dnsList[$mainDomain] = array_merge($this->dnsList[$mainDomain], $this->dnsList[$alias]);
+                }
+                unset($this->dnsList[$alias]);
+            }
+        }
+        
         Db::name('cert_order')->where('id', $this->order['id'])->update(['info' => json_encode($this->info), 'dns' => json_encode($this->dnsList)]);
 
         if (!empty($this->dnsList)) {

@@ -208,3 +208,12 @@ CREATE TABLE IF NOT EXISTS `dnsmgr_sctask` (
 ALTER TABLE `dnsmgr_account`
 ADD COLUMN `config` text DEFAULT NULL,
 CHANGE COLUMN `ak` `name` varchar(255) NOT NULL;
+
+CREATE TABLE IF NOT EXISTS `dnsmgr_domain_alias` (
+  `id` int(11) unsigned NOT NULL auto_increment,
+  `did` int(11) unsigned NOT NULL,
+  `name` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `did` (`did`),
+  KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
