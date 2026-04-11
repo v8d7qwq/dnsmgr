@@ -11,7 +11,7 @@ class DeployHelper
             'name' => '宝塔面板',
             'class' => 1,
             'icon' => 'bt.png',
-            'desc' => '支持部署到宝塔面板&aaPanel搭建的站点、Docker、邮局与面板本身',
+            'desc' => '支持部署到宝塔Linux面板&aaPanel搭建的站点',
             'note' => null,
             'inputs' => [
                 'url' => [
@@ -26,15 +26,6 @@ class DeployHelper
                     'type' => 'input',
                     'placeholder' => '宝塔面板设置->面板设置->API接口',
                     'required' => true,
-                ],
-                'version' => [
-                    'name' => '面板版本',
-                    'type' => 'radio',
-                    'options' => [
-                        '0' => 'Linux面板+Win经典版',
-                        '1' => 'Win极速版',
-                    ],
-                    'value' => '0'
                 ],
                 'proxy' => [
                     'name' => '使用代理服务器',
@@ -55,6 +46,7 @@ class DeployHelper
                         '3' => 'Docker网站的证书',
                         '2' => '邮局域名的证书',
                         '1' => '面板本身的证书',
+                        '4' => '反向代理的证书',
                     ],
                     'value' => '0',
                     'required' => true,
@@ -64,7 +56,58 @@ class DeployHelper
                     'type' => 'textarea',
                     'placeholder' => '填写要部署证书的网站名称，每行一个',
                     'note' => 'PHP项目和反代项目填写创建时绑定的第一个域名，Java/Node/Go等其他项目填写项目名称，邮局和IIS站点填写绑定的域名',
-                    'show' => 'type==0||type==2||type==3',
+                    'show' => 'type==0||type==2||type==3||type==4',
+                    'required' => true,
+                ],
+            ],
+        ],
+        'btwin' => [
+            'name' => '宝塔Win极速版',
+            'class' => 1,
+            'icon' => 'bt.png',
+            'desc' => '支持部署到宝塔Windows面板极速版',
+            'note' => null,
+            'inputs' => [
+                'url' => [
+                    'name' => '面板地址',
+                    'type' => 'input',
+                    'placeholder' => '宝塔面板地址',
+                    'note' => '填写规则如：http://192.168.1.100:8888 ，不要带其他后缀',
+                    'required' => true,
+                ],
+                'key' => [
+                    'name' => '接口密钥',
+                    'type' => 'input',
+                    'placeholder' => '宝塔面板设置->面板设置->API接口',
+                    'required' => true,
+                ],
+                'proxy' => [
+                    'name' => '使用代理服务器',
+                    'type' => 'radio',
+                    'options' => [
+                        '0' => '否',
+                        '1' => '是',
+                    ],
+                    'value' => '0'
+                ],
+            ],
+            'taskinputs' => [
+                'type' => [
+                    'name' => '部署类型',
+                    'type' => 'radio',
+                    'options' => [
+                        '0' => '网站的证书',
+                        '1' => '面板本身的证书',
+                    ],
+                    'value' => '0',
+                    'required' => true,
+                ],
+                'sites' => [
+                    'name' => '网站名称列表',
+                    'type' => 'textarea',
+                    'placeholder' => '填写要部署证书的网站名称，每行一个',
+                    'note' => '',
+                    'show' => 'type==0',
                     'required' => true,
                 ],
                 'is_iis' => [
@@ -1299,7 +1342,7 @@ ctrl+x 保存退出<br/>',
                 'domain' => [
                     'name' => '绑定的域名',
                     'type' => 'input',
-                    'placeholder' => '',
+                    'placeholder' => '多个域名可用,隔开',
                     'show' => 'product!=\'esa\'&&product!=\'esa_saas\'&&product!=\'clb\'&&product!=\'alb\'&&product!=\'nlb\'&&product!=\'ga\'&&product!=\'upload\'',
                     'required' => true,
                 ],
@@ -2117,7 +2160,7 @@ ctrl+x 保存退出<br/>',
                 'domain' => [
                     'name' => '绑定的域名',
                     'type' => 'input',
-                    'placeholder' => '',
+                    'placeholder' => '多个域名可使用,分隔',
                     'required' => true,
                 ],
             ],
@@ -2611,6 +2654,73 @@ ctrl+x 保存退出<br/>',
                     'type' => 'input',
                     'placeholder' => '留空为不设置密码',
                     'show' => 'format==\'pfx\'',
+                ],
+            ],
+        ],
+        's3storage' => [
+            'name' => 'S3存储',
+            'class' => 3,
+            'icon' => 'cloud.png',
+            'desc' => '支持将证书上传到S3兼容存储（AWS S3、MinIO等）',
+            'note' => '支持AWS S3、MinIO、阿里云OSS（S3兼容模式）等S3协议兼容的对象存储服务',
+            'tasknote' => '证书和私钥将以PEM格式上传到指定的存储桶路径',
+            'inputs' => [
+                'AccessKeyId' => [
+                    'name' => 'AccessKeyId',
+                    'type' => 'input',
+                    'placeholder' => '',
+                    'required' => true,
+                ],
+                'SecretAccessKey' => [
+                    'name' => 'SecretAccessKey',
+                    'type' => 'input',
+                    'placeholder' => '',
+                    'required' => true,
+                ],
+                'endpoint' => [
+                    'name' => 'S3 Endpoint',
+                    'type' => 'input',
+                    'placeholder' => '如：s3.amazonaws.com 或 minio.example.com:9000',
+                    'note' => 'AWS S3填写s3.区域.amazonaws.com，其他S3兼容服务填写对应地址',
+                    'required' => true,
+                ],
+                'region' => [
+                    'name' => '区域',
+                    'type' => 'input',
+                    'placeholder' => '如：us-east-1',
+                    'value' => 'us-east-1',
+                    'required' => true,
+                ],
+                'proxy' => [
+                    'name' => '使用代理服务器',
+                    'type' => 'radio',
+                    'options' => [
+                        '0' => '否',
+                        '1' => '是',
+                    ],
+                    'value' => '0'
+                ],
+            ],
+            'taskinputs' => [
+                'bucket' => [
+                    'name' => '存储桶名称',
+                    'type' => 'input',
+                    'placeholder' => '',
+                    'required' => true,
+                ],
+                'cert_path' => [
+                    'name' => '证书保存路径',
+                    'type' => 'input',
+                    'placeholder' => 'ssl/cert.pem',
+                    'note' => '在存储桶内的文件路径，如 ssl/domain.com/cert.pem',
+                    'required' => true,
+                ],
+                'key_path' => [
+                    'name' => '私钥保存路径',
+                    'type' => 'input',
+                    'placeholder' => 'ssl/key.pem',
+                    'note' => '在存储桶内的文件路径，如 ssl/domain.com/key.pem',
+                    'required' => true,
                 ],
             ],
         ],
