@@ -55,12 +55,17 @@ Route::group(function () {
     Route::post('/cloudflare/hostnames/data/:id', 'cloudflare/hostnames_data');
     Route::post('/cloudflare/hostnames/add/:id', 'cloudflare/hostnames_add');
     Route::post('/cloudflare/hostnames/update/:id', 'cloudflare/hostnames_update');
-    Route::post('/cloudflare/hostnames/refresh/:id', 'cloudflare/hostnames_refresh');
     Route::post('/cloudflare/hostnames/delete/:id', 'cloudflare/hostnames_delete');
+    Route::post('/cloudflare/hostnames/refresh/:id', 'cloudflare/hostnames_refresh');
     Route::post('/cloudflare/hostnames/txttargets/:id', 'cloudflare/hostnames_txt_targets');
+    Route::post('/cloudflare/hostnames/batch_add/:id', 'cloudflare/hostnames_batch_add');
+    Route::post('/cloudflare/hostnames/batch_delete/:id', 'cloudflare/hostnames_batch_delete');
+    Route::post('/cloudflare/hostnames/batch_update/:id', 'cloudflare/hostnames_batch_update');
     Route::post('/cloudflare/fallback/get/:id', 'cloudflare/fallback_get');
     Route::post('/cloudflare/fallback/set/:id', 'cloudflare/fallback_set');
     Route::post('/cloudflare/fallback/delete/:id', 'cloudflare/fallback_delete');
+    Route::post('/cloudflare/dcv_delegation_uuid/:id', 'cloudflare/dcv_delegation_uuid');
+    Route::post('/cloudflare/get_domain_default_line', 'cloudflare/get_domain_default_line');
     Route::get('/cloudflare/tunnels/:id', 'cloudflare/tunnels');
     Route::post('/cloudflare/tunnels/data/:id', 'cloudflare/tunnels_data');
     Route::post('/cloudflare/tunnels/add/:id', 'cloudflare/tunnels_add');
@@ -81,7 +86,13 @@ Route::group(function () {
     Route::post('/domain/data', 'domain/domain_data');
     Route::post('/domain/op', 'domain/domain_op');
     Route::post('/domain/list', 'domain/domain_list');
+    Route::any('/domain/dnscheck', 'domain/dnscheck');
+    Route::post('/domain/category/data', 'domain/category_data');
+    Route::post('/domain/category/:action', 'domain/category_op');
+    Route::get('/domain/category/list', 'domain/category_list');
+    Route::post('/domain/setcategory', 'domain/domain_set_category');
     Route::get('/domain/add', 'domain/domain_add');
+    Route::get('/domain/category', 'domain/category');
     Route::get('/domain', 'domain/domain');
 
     Route::post('/record/data/:id', 'domain/record_data');
@@ -90,17 +101,21 @@ Route::group(function () {
     Route::post('/record/delete/:id', 'domain/record_delete');
     Route::post('/record/status/:id', 'domain/record_status');
     Route::post('/record/remark/:id', 'domain/record_remark');
+    Route::post('/record/check/:id', 'domain/record_check');
     Route::post('/record/batch/:id', 'domain/record_batch');
     Route::post('/record/batchedit/:id', 'domain/record_batch_edit');
     Route::any('/record/batchadd/:id', 'domain/record_batch_add');
     Route::get('/record/batchadd', 'domain/record_batch_add2');
     Route::any('/record/batchedit', 'domain/record_batch_edit2');
     Route::any('/record/log/:id', 'domain/record_log');
+    Route::post('/record/groups/:id', 'domain/record_groups');
     Route::post('/record/list', 'domain/record_list');
     Route::post('/record/weight/data/:id', 'domain/weight_data');
     Route::any('/record/weight/:id', 'domain/weight');
     Route::any('/record/alias/:id', 'domain/alias');
     Route::get('/record/:id', 'domain/record');
+    Route::get('/record/smartparse', 'domain/smartparse');
+    Route::post('/record/quickinfo/:id', 'domain/quickinfo');
 
     Route::get('/dmonitor/overview', 'dmonitor/overview');
     Route::post('/dmonitor/task/data', 'dmonitor/task_data');
@@ -158,6 +173,7 @@ Route::group(function () {
     Route::get('/system/mailtest', 'system/mailtest');
     Route::get('/system/tgbottest', 'system/tgbottest');
     Route::get('/system/webhooktest', 'system/webhooktest');
+    Route::get('/system/customwebhooktest', 'system/customwebhooktest');
     Route::post('/system/proxytest', 'system/proxytest');
     Route::get('/system/cronset', 'system/cronset');
 
