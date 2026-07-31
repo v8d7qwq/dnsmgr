@@ -159,6 +159,9 @@ class AWS
             'X-Amz-Date' => $date,
             //'X-Amz-Content-Sha256' => hash("sha256", $body),
         ];
+        if ($method != 'GET' && $method != 'DELETE') {
+            $headers['Content-Type'] = 'application/xml';
+        }
         if ($this->etag) {
             $headers['If-Match'] = $this->etag;
         }
@@ -286,7 +289,6 @@ class AWS
         $errno = curl_errno($ch);
         if ($errno) {
             $errmsg = curl_error($ch);
-            curl_close($ch);
             throw new Exception('Curl error: ' . $errmsg);
         }
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -297,7 +299,6 @@ class AWS
             $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
             $response = substr($response, $headerSize);
         }
-        curl_close($ch);
 
         if ($httpCode >= 200 && $httpCode < 300) {
             if (empty($response)) return true;
@@ -355,7 +356,8 @@ class AWS
                 }
 
             } else {
-                $xml->addChild($key, $value);
+                $escapedValue = htmlspecialchars((string)$value, ENT_XML1 | ENT_COMPAT, 'UTF-8');
+                $xml->addChild($tagName, $escapedValue);
             }
         }
 
