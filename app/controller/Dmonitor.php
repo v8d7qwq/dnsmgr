@@ -124,8 +124,10 @@ class Dmonitor extends BaseController
                     return json(['code' => -1, 'msg' => 'TCP代理不存在或未启用']);
                 }
             }
-            if (Db::name('dmtask')->where('recordid', $task['recordid'])->find()) {
-                return json(['code' => -1, 'msg' => '当前容灾切换策略已存在']);
+            if ($task['checktype'] >= 2 || empty($task['checkurl'])) {
+                if (Db::name('dmtask')->where('recordid', $task['recordid'])->find()) {
+                    return json(['code' => -1, 'msg' => '当前容灾切换策略已存在']);
+                }
             }
             Db::name('dmtask')->insert($task);
             return json(['code' => 0, 'msg' => '添加成功']);
@@ -168,8 +170,10 @@ class Dmonitor extends BaseController
                     return json(['code' => -1, 'msg' => 'TCP代理不存在或未启用']);
                 }
             }
-            if (Db::name('dmtask')->where('recordid', $task['recordid'])->where('id', '<>', $id)->find()) {
-                return json(['code' => -1, 'msg' => '当前容灾切换策略已存在']);
+            if ($task['checktype'] >= 2 || empty($task['checkurl'])) {
+                if (Db::name('dmtask')->where('recordid', $task['recordid'])->where('id', '<>', $id)->find()) {
+                    return json(['code' => -1, 'msg' => '当前容灾切换策略已存在']);
+                }
             }
             Db::name('dmtask')->where('id', $id)->update($task);
             return json(['code' => 0, 'msg' => '修改成功']);
