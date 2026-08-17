@@ -2,8 +2,6 @@
 
 namespace app\utils;
 
-use Exception;
-
 class DnsQueryUtils
 {
     private static $doh_servers = ['https://dns.alidns.com/resolve', 'https://doh.pub/resolve', 'https://doh.360.cn/resolve'];
@@ -14,7 +12,7 @@ class DnsQueryUtils
         if (!array_key_exists($type, $dns_type)) return false;
         try{
             $list = dns_get_record($domain, $dns_type[$type]);
-        }catch(Exception $e){
+        }catch(\Throwable $e){
             return false;
         }
         if (!$list || empty($list)) return false;
@@ -68,26 +66,98 @@ class DnsQueryUtils
     /**
      * 将域名/CNAME 解析为第一条 IPv4 A 记录。
      * 传入本身已是 IPv4 时直接返回。解析失败返回 false。
+     * 会跟随 CNAME 链（本地解析 / DoH），最多 8 跳。
      */
     public static function resolveToA($domain)
     {
-        $domain = rtrim(trim($domain), '.');
+        $domain = strtolower(rtrim(trim($domain), '.'));
         if ($domain === '') return false;
         if (filter_var($domain, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
             return $domain;
         }
-        $records = self::get_dns_records($domain, 'A');
-        if ($records === false || empty($records)) {
-            $records = self::query_dns_doh($domain, 'A');
+
+        $seen = [];
+        for ($i = 0; $i < 8; $i++) {
+            if ($domain === '' || isset($seen[$domain])) {
+                break;
+            }
+            $seen[$domain] = true;
+
+            $ip = self::lookupIpv4($domain);
+            if ($ip) return $ip;
+
+            $cname = self::lookupCname($domain);
+            if (!$cname) {
+                break;
+            }
+            $domain = strtolower(rtrim($cname, '.'));
         }
-        if ($records === false || empty($records)) {
-            return false;
-        }
-        foreach ($records as $ip) {
-            $ip = trim($ip, '.');
-            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+        return false;
+    }
+
+    private static function lookupIpv4($domain)
+    {
+        try {
+            $ip = gethostbyname($domain);
+            if ($ip && $ip !== $domain && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
                 return $ip;
             }
+        } catch (\Throwable $e) {
+        }
+
+        $ip = self::firstIpv4(self::get_dns_records($domain, 'A'));
+        if ($ip) return $ip;
+
+        return self::firstIpv4(self::queryDohByType($domain, 'A'));
+    }
+
+    private static function lookupCname($domain)
+    {
+        $records = self::get_dns_records($domain, 'CNAME');
+        if ($records === false || empty($records)) {
+            $records = self::queryDohByType($domain, 'CNAME');
+        }
+        if ($records === false || empty($records)) return false;
+        foreach ($records as $val) {
+            $val = strtolower(rtrim(trim($val), '.'));
+            if ($val !== '' && !filter_var($val, FILTER_VALIDATE_IP)) {
+                return $val;
+            }
+        }
+        return false;
+    }
+
+    private static function firstIpv4($records)
+    {
+        if ($records === false || empty($records)) return false;
+        foreach ($records as $val) {
+            $val = rtrim(trim($val), '.');
+            if (filter_var($val, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                return $val;
+            }
+        }
+        return false;
+    }
+
+    private static function queryDohByType($domain, $type)
+    {
+        $dns_type = ['A' => 1, 'AAAA' => 28, 'CNAME' => 5];
+        if (!isset($dns_type[$type])) return false;
+        $want = $dns_type[$type];
+        foreach (self::$doh_servers as $server) {
+            $url = $server . '?name=' . urlencode($domain) . '&type=' . $want;
+            $data = get_curl($url, 0, 0, 0, 0, 0, ['Accept' => 'application/dns-json']);
+            if (!$data) continue;
+            $arr = json_decode($data, true);
+            if (!$arr || empty($arr['Answer']) || !is_array($arr['Answer'])) continue;
+            $result = [];
+            foreach ($arr['Answer'] as $row) {
+                if (!isset($row['type'], $row['data']) || intval($row['type']) !== $want) continue;
+                $value = $row['data'];
+                if ($want === 5) $value = trim($value, '.');
+                $result[] = $value;
+            }
+            if (!empty($result)) return $result;
         }
         return false;
     }
