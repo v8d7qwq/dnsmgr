@@ -101,6 +101,7 @@ class Dmonitor extends BaseController
                 'proxy' => input('post.proxy/d'),
                 'tcp_proxy_id' => input('post.tcp_proxy_id/d', 0),
                 'cdn' => input('post.cdn') == 'true' || input('post.cdn') == '1' ? 1 : 0,
+                'cname_flatten' => input('post.cname_flatten') == 'true' || input('post.cname_flatten') == '1' ? 1 : 0,
                 'remark' => input('post.remark', null, 'trim'),
                 'recordinfo' => input('post.recordinfo', null, 'trim'),
                 'addtime' => time(),
@@ -115,6 +116,10 @@ class Dmonitor extends BaseController
             }
             if ($task['type'] == 2 && $task['backup_value'] == $task['main_value']) {
                 return json(['code' => -1, 'msg' => '主备地址不能相同']);
+            }
+            if ($task['type'] != 2) {
+                $task['cdn'] = 0;
+                $task['cname_flatten'] = 0;
             }
             if ($task['checktype'] != 1) {
                 $task['tcp_proxy_id'] = 0;
@@ -149,6 +154,7 @@ class Dmonitor extends BaseController
                 'proxy' => input('post.proxy/d'),
                 'tcp_proxy_id' => input('post.tcp_proxy_id/d', 0),
                 'cdn' => input('post.cdn') == 'true' || input('post.cdn') == '1' ? 1 : 0,
+                'cname_flatten' => input('post.cname_flatten') == 'true' || input('post.cname_flatten') == '1' ? 1 : 0,
                 'remark' => input('post.remark', null, 'trim'),
                 'recordinfo' => input('post.recordinfo', null, 'trim'),
             ];
@@ -161,6 +167,10 @@ class Dmonitor extends BaseController
             }
             if ($task['type'] == 2 && $task['backup_value'] == $task['main_value']) {
                 return json(['code' => -1, 'msg' => '主备地址不能相同']);
+            }
+            if ($task['type'] != 2) {
+                $task['cdn'] = 0;
+                $task['cname_flatten'] = 0;
             }
             if ($task['checktype'] != 1) {
                 $task['tcp_proxy_id'] = 0;

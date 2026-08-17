@@ -64,4 +64,31 @@ class DnsQueryUtils
         }
         return $result;
     }
+
+    /**
+     * 将域名/CNAME 解析为第一条 IPv4 A 记录。
+     * 传入本身已是 IPv4 时直接返回。解析失败返回 false。
+     */
+    public static function resolveToA($domain)
+    {
+        $domain = rtrim(trim($domain), '.');
+        if ($domain === '') return false;
+        if (filter_var($domain, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return $domain;
+        }
+        $records = self::get_dns_records($domain, 'A');
+        if ($records === false || empty($records)) {
+            $records = self::query_dns_doh($domain, 'A');
+        }
+        if ($records === false || empty($records)) {
+            return false;
+        }
+        foreach ($records as $ip) {
+            $ip = trim($ip, '.');
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                return $ip;
+            }
+        }
+        return false;
+    }
 }

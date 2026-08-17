@@ -58,12 +58,18 @@
             <input type="text" name="backup_value" v-model="set.backup_value" placeholder="支持填写IP或CNAME地址" class="form-control" required>
         </div>
     </div>
-    <div class="form-group" v-show="set.type==2&&dnstype=='cloudflare'">
+    <div class="form-group" v-show="set.type==2">
         <div class="col-sm-offset-3 col-sm-7">
+            <div class="checkbox" v-show="dnstype=='cloudflare'">
+                <label>
+                    <input type="checkbox" name="cdn" v-model="set.cdn"> 切换时同时开启Cloudflare代理模式
+                </label>
+            </div>
             <div class="checkbox">
                 <label>
-                    <input type="checkbox" name="name" v-model="set.cdn"> 切换时同时开启Cloudflare代理模式
-                </label> 
+                    <input type="checkbox" name="cname_flatten" v-model="set.cname_flatten"> CNAME 展平为A记录
+                </label>
+                <span class="tips" title="" data-toggle="tooltip" data-placement="bottom" data-original-title="勾选后，切换时会将备用CNAME地址实时解析为A记录IP后写入。备用地址本身已是IP时无效果。"><i class="fa fa-question-circle"></i></span>
             </div>
         </div>
     </div>
@@ -190,6 +196,7 @@ new Vue({
             proxy: 0,
             tcp_proxy_id: 0,
             cdn: 0,
+            cname_flatten: 0,
         },
         dnstype: null,
         domainList: domainList,
@@ -229,6 +236,8 @@ new Vue({
             })
             var recordinfo = JSON.parse(this.set.recordinfo);
             this.recordList = [{RecordId:this.set.recordid, Value:this.set.main_value, Line:recordinfo.Line, LineName:recordinfo.LineName, TTL:recordinfo.TTL}];
+            this.set.cdn = this.set.cdn == 1 || this.set.cdn === true || this.set.cdn === '1';
+            this.set.cname_flatten = this.set.cname_flatten == 1 || this.set.cname_flatten === true || this.set.cname_flatten === '1';
         }
         $("#taskform").bootstrapValidator({
             live: 'submitted',

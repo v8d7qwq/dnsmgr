@@ -231,3 +231,6 @@ CREATE TABLE IF NOT EXISTS `dnsmgr_domain_category` (
 ALTER TABLE `dnsmgr_domain`
 ADD COLUMN `cid` int(11) unsigned NOT NULL DEFAULT '0',
 ADD KEY `cid` (`cid`);
+
+ALTER TABLE `dnsmgr_dmtask`
+ADD COLUMN `cname_flatten` tinyint(1) NOT NULL DEFAULT 0;

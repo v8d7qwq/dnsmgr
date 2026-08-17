@@ -120,6 +120,7 @@ CREATE TABLE `dnsmgr_dmtask` (
   `proxy` tinyint(1) NOT NULL DEFAULT 0,
   `tcp_proxy_id` int(11) NOT NULL DEFAULT 0,
   `cdn` tinyint(1) NOT NULL DEFAULT 0,
+  `cname_flatten` tinyint(1) NOT NULL DEFAULT 0,
   `addtime` int(11) NOT NULL DEFAULT 0,
   `checktime` int(11) NOT NULL DEFAULT 0,
   `checknexttime` int(11) NOT NULL DEFAULT 0,

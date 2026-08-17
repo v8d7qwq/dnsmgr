@@ -5,6 +5,7 @@ namespace app\service;
 use app\lib\NewDb;
 use app\lib\DnsHelper;
 use app\utils\CheckUtils;
+use app\utils\DnsQueryUtils;
 use app\utils\MsgNotice;
 
 /**
@@ -114,7 +115,17 @@ class TaskRunner
                 if ($drow['type'] == 'cloudflare' && $row['cdn'] == 1) {
                     $recordinfo['Line'] = '1';
                 }
-                $res = $dns->updateDomainRecord($row['recordid'], $row['rr'], getDnsType($row['backup_value']), $row['backup_value'], $recordinfo['Line'], $recordinfo['TTL']);
+                $switchValue = $row['backup_value'];
+                if (!empty($row['cname_flatten']) && getDnsType($switchValue) == 'CNAME') {
+                    $flatIp = DnsQueryUtils::resolveToA($switchValue);
+                    if ($flatIp) {
+                        $row['flatten_ip'] = $flatIp;
+                        $switchValue = $flatIp;
+                    } else {
+                        $this->db()->name('log')->insert(['uid' => 0, 'domain' => $drow['name'], 'action' => 'CNAME展平失败', 'data' => $row['rr'].' 备用地址 '.$row['backup_value'].' 未解析到A记录，将按原CNAME写入', 'addtime' => date("Y-m-d H:i:s")]);
+                    }
+                }
+                $res = $dns->updateDomainRecord($row['recordid'], $row['rr'], getDnsType($switchValue), $switchValue, $recordinfo['Line'], $recordinfo['TTL']);
                 if (!$res) {
                     $this->db()->name('log')->insert(['uid' => 0, 'domain' => $drow['name'], 'action' => '修改解析失败', 'data' => $dns->getError(), 'addtime' => date("Y-m-d H:i:s")]);
                 }

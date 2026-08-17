@@ -96,7 +96,10 @@ $(document).ready(function(){
 					if(value == 1) {
 						return '暂停解析';
 					} else if(value == 2) {
-						return '<span title="" data-toggle="tooltip" data-placement="bottom" data-original-title="备用：'+row.backup_value+'" class="tips">切换备用</span>';
+						var extra = '';
+						if(row.cname_flatten == 1) extra += '；CNAME展平为A记录';
+						if(row.cdn == 1) extra += '；开启CF代理';
+						return '<span title="" data-toggle="tooltip" data-placement="bottom" data-original-title="备用：'+row.backup_value+extra+'" class="tips">切换备用</span>';
 					} else if(value == 3) {
 						return '<span title="" data-toggle="tooltip" data-placement="bottom" data-original-title="同域名正常数量<='+row.cycle+'" class="tips">条件开启</span>';
 					} else {
