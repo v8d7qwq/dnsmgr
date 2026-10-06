@@ -138,6 +138,10 @@ class Dmonitor extends BaseController
             return json(['code' => 0, 'msg' => '添加成功']);
         } elseif ($action == 'edit') {
             $id = input('post.id/d');
+            $oldTask = Db::name('dmtask')->where('id', $id)->find();
+            if (!$oldTask) {
+                return json(['code' => -1, 'msg' => '切换策略不存在']);
+            }
             $task = [
                 'did' => input('post.did/d'),
                 'rr' => input('post.rr', null, 'trim'),
@@ -180,7 +184,10 @@ class Dmonitor extends BaseController
                     return json(['code' => -1, 'msg' => 'TCP代理不存在或未启用']);
                 }
             }
-            if ($task['checktype'] >= 2 || empty($task['checkurl'])) {
+            // 同一记录可追加指定检测IP的策略，编辑原有策略时不应因此被判重。
+            $recordChanged = $oldTask['did'] != $task['did'] || $oldTask['recordid'] != $task['recordid'];
+            $hadCheckIp = $oldTask['checktype'] < 2 && !empty($oldTask['checkurl']);
+            if (($recordChanged || $hadCheckIp) && ($task['checktype'] >= 2 || empty($task['checkurl']))) {
                 if (Db::name('dmtask')->where('recordid', $task['recordid'])->where('id', '<>', $id)->find()) {
                     return json(['code' => -1, 'msg' => '当前容灾切换策略已存在']);
                 }
