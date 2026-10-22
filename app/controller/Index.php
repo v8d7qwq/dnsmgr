@@ -67,7 +67,6 @@ class Index extends BaseController
             'date' => date("Y-m-d H:i:s"),
         ];
         View::assign('info', $info);
-        View::assign('checkupdate', '//auth.cccyun.cc/app/dnsmgr.php?ver=' . config('app.version'));
         return view();
     }
 
