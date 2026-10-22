@@ -166,7 +166,7 @@ class CheckUtils
         $proxyUser = strval($proxyRow['proxy_user'] ?? '');
         $proxyPwd = strval($proxyRow['proxy_pwd'] ?? '');
         if ($proxyServer === '' || $proxyPort < 1 || $proxyPort > 65535) {
-            return ['status' => false, 'errmsg' => 'Invalid proxy address', 'usetime' => 0];
+            return ['status' => false, 'errmsg' => 'Invalid proxy address', 'usetime' => 0, 'proxy_error' => true];
         }
 
         $errno = 0;
@@ -174,10 +174,11 @@ class CheckUtils
         $fp = @stream_socket_client('tcp://' . $proxyServer . ':' . $proxyPort, $errno, $errstr, $timeout, STREAM_CLIENT_CONNECT);
         if (!$fp) {
             $usetime = round((microtime(true) - $start) * 1000);
-            return ['status' => false, 'errmsg' => 'Proxy connect failed: ' . ($errstr ?: $errno), 'usetime' => $usetime];
+            return ['status' => false, 'errmsg' => 'Proxy connect failed: ' . ($errstr ?: $errno), 'usetime' => $usetime, 'proxy_error' => true];
         }
         stream_set_timeout($fp, $timeout);
 
+        $proxyError = true;
         try {
             // 1) greeting
             $methods = ["\x00"]; // no-auth
@@ -223,6 +224,8 @@ class CheckUtils
                 throw new \Exception('SOCKS auth method unsupported');
             }
 
+            // 已完成代理握手，本地目标地址或 DNS 错误不属于代理故障。
+            $proxyError = false;
             // 3) build connect request
             $atyp = null;
             $addrBin = '';
@@ -262,22 +265,29 @@ class CheckUtils
                 throw new \Exception('Target address invalid');
             }
             $req = "\x05" . "\x01" . "\x00" . chr($atyp) . $addrBin . pack('n', $destPort);
+            $proxyError = true;
             if (fwrite($fp, $req) === false) {
                 throw new \Exception('SOCKS connect write failed');
             }
 
             // 4) read connect response
+            // 代理已完成握手并接收请求，等待目标连接超时仍按目标故障处理。
+            $proxyError = false;
             $head = self::readExact($fp, 4);
             if ($head === false || strlen($head) != 4) {
+                $proxyError = empty(stream_get_meta_data($fp)['timed_out']);
                 throw new \Exception('SOCKS connect timeout');
             }
             $ver = ord($head[0]);
             $rep = ord($head[1]);
             $atyp2 = ord($head[3]);
-            if ($ver !== 0x05) {
+            if ($ver !== 0x05 || ord($head[2]) !== 0x00) {
+                $proxyError = true;
                 throw new \Exception('SOCKS connect response invalid');
             }
             if ($rep !== 0x00) {
+                // 目标不可达/拒绝连接仍参与容灾判断；代理配置或协议错误单独告警。
+                $proxyError = !in_array($rep, [0x03, 0x04, 0x05, 0x06], true);
                 $repMsg = match ($rep) {
                     0x01 => 'general failure',
                     0x02 => 'connection not allowed',
@@ -292,27 +302,32 @@ class CheckUtils
                 throw new \Exception('SOCKS connect failed: ' . $repMsg);
             }
             // consume BND.ADDR + BND.PORT
+            $proxyError = true;
             if ($atyp2 === 0x01) {
-                self::readExact($fp, 4);
+                $bound = self::readExact($fp, 6);
             } elseif ($atyp2 === 0x04) {
-                self::readExact($fp, 16);
+                $bound = self::readExact($fp, 18);
             } elseif ($atyp2 === 0x03) {
                 $l = self::readExact($fp, 1);
-                if ($l !== false) {
-                    $len = ord($l[0]);
-                    if ($len > 0) self::readExact($fp, $len);
+                if ($l === false || ord($l[0]) === 0) {
+                    throw new \Exception('SOCKS connect response invalid');
                 }
+                $bound = self::readExact($fp, ord($l[0]) + 2);
+            } else {
+                throw new \Exception('SOCKS connect response invalid');
             }
-            self::readExact($fp, 2);
+            if ($bound === false) {
+                throw new \Exception('SOCKS connect response incomplete');
+            }
 
             fclose($fp);
             $usetime = round((microtime(true) - $start) * 1000);
-            return ['status' => true, 'errmsg' => null, 'usetime' => $usetime];
+            return ['status' => true, 'errmsg' => null, 'usetime' => $usetime, 'proxy_error' => false];
         } catch (\Throwable $e) {
             $errmsg = $e->getMessage();
             try { fclose($fp); } catch (\Throwable $e2) {}
             $usetime = round((microtime(true) - $start) * 1000);
-            return ['status' => false, 'errmsg' => $errmsg, 'usetime' => $usetime];
+            return ['status' => false, 'errmsg' => $errmsg, 'usetime' => $usetime, 'proxy_error' => $proxyError];
         }
     }
 

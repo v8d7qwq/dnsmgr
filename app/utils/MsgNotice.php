@@ -46,6 +46,34 @@ class MsgNotice
         if (!empty($task['remark'])) {
             $mail_content .= '<br/>备注：'.$task['remark'];
         }
+
+        self::monitor_send($mail_title, $mail_content);
+    }
+
+    public static function tcp_proxy_send($proxy, bool $recovered, ?string $errmsg = null, int $failtime = 0)
+    {
+        $name = htmlspecialchars($proxy['name'] ?? ('代理 #' . $proxy['id']), ENT_QUOTES, 'UTF-8');
+        $address = isset($proxy['proxy_server'], $proxy['proxy_port'])
+            ? htmlspecialchars($proxy['proxy_server'] . ':' . $proxy['proxy_port'], ENT_QUOTES, 'UTF-8')
+            : '不可用';
+        $mail_title = 'DNS容灾检测-TCP代理' . ($recovered ? '恢复正常' : '连接失败') . '通知';
+        $mail_content = '尊敬的用户，您好：<br/>TCP代理 <b>' . $name . '</b>（ID：' . intval($proxy['id']) . '，地址：' . $address . '）';
+        if ($recovered) {
+            $mail_content .= '已恢复连接，使用该代理的容灾策略已恢复TCP检测。';
+            if ($failtime > 0) {
+                $mail_content .= '<br/>异常持续时间：' . convert_second(max(0, time() - $failtime));
+            }
+        } else {
+            $mail_content .= '不可用，使用该代理的容灾策略已暂停本轮目标状态判断，当前DNS解析保持不变，请及时处理。';
+            if (!empty($errmsg)) {
+                $mail_content .= '<br/>异常信息：<font color="warning">' . htmlspecialchars($errmsg, ENT_QUOTES, 'UTF-8') . '</font>';
+            }
+        }
+        self::monitor_send($mail_title, $mail_content);
+    }
+
+    private static function monitor_send($mail_title, $mail_content)
+    {
         $mail_content .= '<br/><font color="grey">'.self::$sitename.'</font><br/><font color="grey">'.date('Y-m-d H:i:s').'</font>';
 
         if (config_get('notice_mail') == 1) {

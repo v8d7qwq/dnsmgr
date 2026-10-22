@@ -70,7 +70,10 @@ class TaskRunner
                         $useRemoteDns = ($proxy['proxy_type'] ?? '') == 'sock5h';
                         $result = CheckUtils::tcpViaSocks5($target, $row['tcpport'], $row['timeout'], $proxy, $useRemoteDns);
                     } else {
-                        $result = ['status' => false, 'errmsg' => 'TCP代理不存在或未启用', 'usetime' => 0];
+                        $result = ['status' => false, 'errmsg' => 'TCP代理不存在或未启用', 'usetime' => 0, 'proxy_error' => true];
+                    }
+                    if ($this->handleTcpProxyResult($row, $proxy ?: ['id' => $tcpProxyId], $result)) {
+                        return;
                     }
                 } else {
                     $result = CheckUtils::tcp($row['main_value'], $row['checkurl'], $row['tcpport'], $row['timeout']);
@@ -170,5 +173,36 @@ class TaskRunner
         if ($row['type'] != 3) {
             MsgNotice::send($action, $row, $result);
         }
+    }
+
+    private function handleTcpProxyResult($row, $proxy, $result): bool
+    {
+        if (!array_key_exists('proxy_error', $result)) {
+            return false;
+        }
+
+        // 使用 config 表的唯一键持久化告警，跨策略、协程及进程重启去重。
+        $key = 'tcp_proxy_failure_' . intval($proxy['id']);
+        if ($result['proxy_error']) {
+            $firstFailure = $this->db()->name('config')->extra('IGNORE')->insert([
+                'key' => $key,
+                'value' => sprintf('%.6f', microtime(true)),
+            ]);
+            if ($row['errcount'] > 0) {
+                $this->db()->name('dmtask')->where('id', $row['id'])->update(['errcount' => 0]);
+            }
+            $this->closeDb();
+            if ($firstFailure) {
+                MsgNotice::tcp_proxy_send($proxy, false, $result['errmsg']);
+            }
+            return true;
+        }
+
+        $failtime = $this->db()->name('config')->where('key', $key)->value('value');
+        if ($failtime !== null && $this->db()->name('config')->where('key', $key)->where('value', $failtime)->delete()) {
+            $this->closeDb();
+            MsgNotice::tcp_proxy_send($proxy, true, null, intval($failtime));
+        }
+        return false;
     }
 }
