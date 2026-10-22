@@ -182,13 +182,13 @@ class DeployHelper
                     'type' => 'radio',
                     'options' => [
                         '0' => '网站SSL证书',
-                        '1' => '单域名SSL证书（仅CDN支持）',
+                        '1' => '单域名SSL证书',
                     ],
                     'value' => '0',
                     'required' => true,
                 ],
                 'domains' => [
-                    'name' => 'CDN域名列表',
+                    'name' => '域名列表',
                     'type' => 'textarea',
                     'placeholder' => '填写要部署证书的域名，每行一个',
                     'show' => 'type==1',
@@ -249,13 +249,13 @@ class DeployHelper
                     'type' => 'radio',
                     'options' => [
                         '0' => '网站SSL证书',
-                        '1' => '单域名SSL证书（仅CDN支持）',
+                        '1' => '单域名SSL证书',
                     ],
                     'value' => '0',
                     'required' => true,
                 ],
                 'domains' => [
-                    'name' => 'CDN域名列表',
+                    'name' => '域名列表',
                     'type' => 'textarea',
                     'placeholder' => '填写要部署证书的域名，每行一个',
                     'show' => 'type==1',
@@ -591,6 +591,46 @@ class DeployHelper
                     'placeholder' => '',
                     'note' => '在证书管理查看证书的名称',
                     'required' => true,
+                ],
+            ],
+        ],
+        'samwaf' => [
+            'name' => 'SamWaf',
+            'class' => 1,
+            'icon' => 'waf.png',
+            'desc' => '支持部署到SamWaf证书夹',
+            'note' => '登录SamWaf控制台->开放平台->密钥管理，创建后获取API Key。需先在系统配置中开启开放平台。',
+            'inputs' => [
+                'url' => [
+                    'name' => '控制台地址',
+                    'type' => 'input',
+                    'placeholder' => 'SamWaf控制台地址',
+                    'note' => '填写示例：http://192.168.1.100:26666 ，不要带其他后缀。若启用了安全访问路径，则填写 http://IP:端口/安全码',
+                    'required' => true,
+                ],
+                'api_key' => [
+                    'name' => 'API Key',
+                    'type' => 'input',
+                    'placeholder' => '',
+                    'note' => '开放平台密钥，请求头 X-API-Key',
+                    'required' => true,
+                ],
+                'proxy' => [
+                    'name' => '使用代理服务器',
+                    'type' => 'radio',
+                    'options' => [
+                        '0' => '否',
+                        '1' => '是',
+                    ],
+                    'value' => '0'
+                ],
+            ],
+            'taskinputs' => [
+                'id' => [
+                    'name' => '证书ID',
+                    'type' => 'input',
+                    'placeholder' => '留空则为添加证书',
+                    'note' => '在证书夹查看证书的ID，注意域名是否与证书匹配',
                 ],
             ],
         ],
