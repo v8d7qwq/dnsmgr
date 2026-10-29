@@ -23,7 +23,7 @@
 .dm-group b{font-weight:600;margin-right:8px}
 .dm-meta{color:#555;font-size:12px;margin-right:6px}
 .dm-isp{display:inline-flex;align-items:center;gap:5px;padding:1px 9px 1px 6px;border-radius:11px;font-size:12px;font-weight:600;line-height:18px;white-space:nowrap}
-.dm-isp>img{height:14px;width:auto;display:block}
+.dm-isp>img{width:14px;height:14px;object-fit:contain;display:block}
 .dm-isp-mobile{background:#e3f1fa;color:#00578f}
 .dm-isp-telecom{background:#e6ecf7;color:#173a7a}
 .dm-isp-unicom{background:#fde7e9;color:#a8000d}
@@ -33,11 +33,20 @@
 .dm-tag-orange{background:#c2410c;color:#fff}
 .dm-tag-blue{background:#1d4ed8;color:#fff}
 .dm-tag-amber{background:#fde68a;color:#713f12}
-.dm-tag-gray{background:#e5e7eb;color:#374151}
-.dm-tag-dark{background:#5f6670;color:#fff}
-.dm-mono{font-family:Menlo,Consolas,monospace;white-space:nowrap}
+.dm-tag-gray{background:#e5e7eb;color:#374151}.dm-mono{font-family:Menlo,Consolas,monospace;white-space:nowrap}
 .dm-muted{color:#555}
 .dm-strong{font-weight:600;color:#c9302c}
+.dm-val{display:flex;align-items:center;white-space:nowrap}
+.dm-val+.dm-val{margin-top:3px}
+.dm-val-main{font-size:13px;color:#1f2329}
+.dm-val-backup{font-size:12px;color:#555}
+.dm-k{flex:none;width:16px;height:16px;margin-right:6px;border-radius:3px;font-size:11px;line-height:16px;text-align:center;font-family:inherit;background:#eceef1;color:#444}
+.dm-val.dm-live .dm-k{background:#1f4e8c;color:#fff}
+.dm-val-backup.dm-live{color:#b42318;font-weight:600}
+.dm-val-backup.dm-live .dm-k{background:#c2410c}
+.dm-val-main.dm-idle{color:#6b7280}
+.dm-rr{color:#555;margin-right:6px}
+.dm-extra{margin-left:6px;font-size:11px;color:#555;font-weight:400}
 .dm-flap{color:#b45309}
 .dm-more{color:#555;padding:2px 8px;font-size:16px}
 .dm-more:hover{color:#333}
@@ -180,7 +189,6 @@ function stateTags(row){
 	}else{
 		html += row.status == 1 ? '<span class="dm-tag dm-tag-red">检测异常</span>' : '<span class="dm-tag dm-tag-gray">仅告警</span>';
 	}
-	if(row.active != 1) html += '<span class="dm-tag dm-tag-dark">已停用</span>';
 	return html;
 }
 
@@ -227,21 +235,26 @@ $(document).ready(function(){
 			},
 			{
 				field: 'main_value',
-				title: '主值→备用',
+				title: '主值 / 备用',
 				formatter: function(value, row, index) {
-					var html = '<span class="dm-mono">';
-					if(hostParts(row).showRr) html += esc(row.rr) + ' ';
-					if(row.type == 2){
-						var onBackup = row.status == 1;
+					// 主值、备用分两行显示，当前生效的一行标签填充高亮
+					var rr = hostParts(row).showRr ? '<span class="dm-rr">' + esc(row.rr) + '</span>' : '';
+					var hasBackup = row.type == 2;
+					var onBackup = hasBackup && row.status == 1;
+					var mainState = '';
+					if(hasBackup) mainState = onBackup ? ' dm-idle' : ' dm-live';
+					else if((row.type == 1 && row.status == 1) || (row.type == 3 && row.status == 0)) mainState = ' dm-idle';
+					var mainTip = hasBackup ? (onBackup ? '主值（当前未生效）' : '主值（当前生效）') : '解析记录值';
+					var html = '<div class="dm-val dm-val-main' + mainState + '" title="' + mainTip + '"><span class="dm-k">主</span>' + rr + '<span class="dm-mono">' + esc(value) + '</span>' + stateTags(row) + '</div>';
+					if(hasBackup){
 						var backup = esc(row.backup_value);
-						if(backup.length > 16) backup = '<span title="' + backup + '">' + backup.substring(0, 12) + '…</span>';
-						html += '<span class="' + (onBackup ? 'dm-muted' : '') + '">' + esc(value) + '</span> <span class="' + (onBackup ? 'dm-strong' : 'dm-muted') + '">→ ' + backup + '</span>';
-						if(row.cname_flatten == 1) html += ' <span class="dm-muted" title="切换时将备用CNAME展平为A记录">展平</span>';
-						if(row.cdn == 1) html += ' <span class="dm-muted" title="切换时开启Cloudflare代理">CF</span>';
-					}else{
-						html += esc(value);
+						if(backup.length > 28) backup = '<span title="' + backup + '">' + backup.substring(0, 24) + '…</span>';
+						var extra = '';
+						if(row.cname_flatten == 1) extra += '<span class="dm-extra" title="切换时将备用CNAME展平为A记录">展平</span>';
+						if(row.cdn == 1) extra += '<span class="dm-extra" title="切换时开启Cloudflare代理">CF代理</span>';
+						html += '<div class="dm-val dm-val-backup' + (onBackup ? ' dm-live' : '') + '" title="' + (onBackup ? '备用（当前生效）' : '备用（故障时切换）') + '"><span class="dm-k">备</span><span class="dm-mono">' + backup + '</span>' + extra + '</div>';
 					}
-					return html + '</span>' + stateTags(row);
+					return html;
 				}
 			},
 			{
