@@ -58,6 +58,7 @@ class ScheduleService
         } elseif ($row['switchtype'] == 3) {
             $res = $dns->deleteDomainRecord($row['recordid']);
             if ($res) {
+                DmtaskSyncService::recordDeleted($row['did'], $row['recordid']);
                 $this->add_log($domain, '删除解析', '定时删除解析成功');
             } else {
                 $this->add_log($domain, '删除解析失败', $dns->getError());
@@ -72,6 +73,7 @@ class ScheduleService
             }
             $res = $dns->updateDomainRecord($row['recordid'], $row['rr'], getDnsType($row['value']), $row['value'], $recordinfo['Line'], $recordinfo['TTL']);
             if ($res) {
+                DmtaskSyncService::recordUpdated($row['did'], $row['recordid'], ['type' => getDnsType($row['value']), 'value' => $row['value']]);
                 $this->add_log($domain, '修改解析', $row['rr'].' ['.getDnsType($row['value']).'] '.$row['value'].' (线路:'.$recordinfo['Line'].' TTL:'.$recordinfo['TTL'].')');
             } else {
                 $this->add_log($domain, '修改解析失败', $dns->getError());

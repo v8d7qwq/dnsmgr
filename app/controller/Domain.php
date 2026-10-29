@@ -8,6 +8,7 @@ use think\facade\View;
 use think\facade\Cache;
 use app\lib\DnsHelper;
 use app\service\ExpireNoticeService;
+use app\service\DmtaskSyncService;
 use app\utils\DnsQueryUtils;
 use Exception;
 
@@ -536,9 +537,11 @@ class Domain extends BaseController
         }
 
         $recordLine = cache('record_line_' . $id);
+        $linked = DmtaskSyncService::linked($id, array_column($domainRecords['list'], 'RecordId'));
 
         foreach ($domainRecords['list'] as &$row) {
             $row['LineName'] = isset($recordLine[$row['Line']]) ? $recordLine[$row['Line']]['name'] : $row['Line'];
+            $row['Dmtask'] = $linked[strval($row['RecordId'])] ?? null;
         }
 
         if (DnsHelper::$dns_config[$dnstype]['page']) {
@@ -633,8 +636,13 @@ class Domain extends BaseController
         }
 
         $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
+        $oldRecordId = $recordid;
         $recordid = $dns->updateDomainRecord($recordid, $name, $type, $value, $line, $ttl, $mx, $weight, $remark);
         if ($recordid) {
+            $oldRecord = $recordinfo ? json_decode($recordinfo, true) : null;
+            $change = ['rr' => $name, 'type' => $type, 'value' => $value, 'line' => $line, 'ttl' => $ttl];
+            if (is_array($oldRecord) && isset($oldRecord['Value'])) $change['old_value'] = is_array($oldRecord['Value']) ? implode(',', $oldRecord['Value']) : $oldRecord['Value'];
+            [$synced, $notices] = $this->sync_dmtask($drow, $oldRecordId, $change, $recordid, input('post.dm_target', null, 'trim'));
             if ($recordinfo) {
                 $recordinfo = json_decode($recordinfo, true);
                 if (is_array($recordinfo)) {
@@ -650,7 +658,7 @@ class Domain extends BaseController
             } else {
                 $this->add_log($drow['name'], '修改解析', $name.' ['.$type.'] '.$value.' (线路:'.$line.' TTL:'.$ttl.')');
             }
-            return json(['code' => 0, 'msg' => '修改解析记录成功！']);
+            return json(['code' => 0, 'msg' => '修改解析记录成功！' . DmtaskSyncService::message($synced, $notices)]);
         } else {
             return json(['code' => -1, 'msg' => '修改解析记录失败，' . $dns->getError()]);
         }
@@ -674,6 +682,7 @@ class Domain extends BaseController
 
         $dns = DnsHelper::getModel($drow['aid'], $drow['name'], $drow['thirdid']);
         if ($dns->deleteDomainRecord($recordid)) {
+            $stopped = DmtaskSyncService::recordDeleted($drow['id'], $recordid);
             if ($recordinfo) {
                 $recordinfo = json_decode($recordinfo, true);
                 if (is_array($recordinfo)) {
@@ -685,7 +694,7 @@ class Domain extends BaseController
             } else {
                 $this->add_log($drow['name'], '删除解析', '记录ID:'.$recordid);
             }
-            return json(['code' => 0, 'msg' => '删除解析记录成功！']);
+            return json(['code' => 0, 'msg' => '删除解析记录成功！' . ($stopped > 0 ? '已停止' . $stopped . '条关联的容灾策略' : '')]);
         } else {
             return json(['code' => -1, 'msg' => '删除解析记录失败，' . $dns->getError()]);
         }
@@ -792,14 +801,16 @@ class Domain extends BaseController
             }
             $msg = '成功暂停' . $success . '条解析记录';
         } else if ($action == 'delete') {
+            $stopped = 0;
             foreach ($recordinfo as $record) {
                 if ($dns->deleteDomainRecord($record['RecordId'])) {
+                    $stopped += DmtaskSyncService::recordDeleted($drow['id'], $record['RecordId']);
                     if (is_array($record['Value'])) $record['Value'] = implode(',', $record['Value']);
                     $this->add_log($drow['name'], '删除解析', $record['Name'].' ['.$record['Type'].'] '.$record['Value'].' (线路:'.$record['Line'].' TTL:'.$record['TTL'].')');
                     $success++;
                 }
             }
-            $msg = '成功删除' . $success . '条解析记录';
+            $msg = '成功删除' . $success . '条解析记录' . ($stopped > 0 ? '，已停止' . $stopped . '条关联的容灾策略' : '');
         } else if ($action == 'remark') {
             $remark = input('post.remark', null, 'trim');
             if (empty($remark)) $remark = null;
@@ -852,17 +863,22 @@ class Domain extends BaseController
 
             $success = 0;
             $fail = 0;
+            $synced = 0;
+            $notices = [];
             foreach ($recordinfo as $record) {
                 $recordid = $dns->updateDomainRecord($record['RecordId'], $record['Name'], $type, $value, $record['Line'], $record['TTL'], $record['MX'], $record['Weight'], $record['Remark']);
                 if ($recordid) {
                     if (is_array($record['Value'])) $record['Value'] = implode(',', $record['Value']);
+                    [$count, $taskNotices] = $this->sync_dmtask($drow, $record['RecordId'], ['type' => $type, 'value' => $value, 'old_value' => $record['Value']], $recordid);
+                    $synced += $count;
+                    $notices = array_merge($notices, $taskNotices);
                     $this->add_log($drow['name'], '修改解析', $record['Name'].' ['.$record['Type'].'] '.$record['Value'].' → '.$record['Name'].' ['.$type.'] '.$value.' (线路:'.$record['Line'].' TTL:'.$record['TTL'].')');
                     $success++;
                 } else {
                     $fail++;
                 }
             }
-            return json(['code' => 0, 'msg' => '批量修改解析记录，成功' . $success . '条，失败' . $fail . '条']);
+            return json(['code' => 0, 'msg' => '批量修改解析记录，成功' . $success . '条，失败' . $fail . '条' . DmtaskSyncService::message($synced, $notices)]);
         } else if ($action == 'line') {
             $line = input('post.line', null, 'trim');
 
@@ -874,9 +890,14 @@ class Domain extends BaseController
 
             $success = 0;
             $fail = 0;
+            $synced = 0;
+            $notices = [];
             foreach ($recordinfo as $record) {
                 $recordid = $dns->updateDomainRecord($record['RecordId'], $record['Name'], $record['Type'], $record['Value'], $line, $record['TTL'], $record['MX'], $record['Weight'], $record['Remark']);
                 if ($recordid) {
+                    [$count, $taskNotices] = $this->sync_dmtask($drow, $record['RecordId'], ['line' => $line], $recordid);
+                    $synced += $count;
+                    $notices = array_merge($notices, $taskNotices);
                     if (is_array($record['Value'])) $record['Value'] = implode(',', $record['Value']);
                     $this->add_log($drow['name'], '修改解析', $record['Name'].' ['.$record['Type'].'] '.$record['Value'].' (线路:'.$line.' TTL:'.$record['TTL'].')');
                     $success++;
@@ -884,7 +905,7 @@ class Domain extends BaseController
                     $fail++;
                 }
             }
-            return json(['code' => 0, 'msg' => '批量修改解析线路，成功' . $success . '条，失败' . $fail . '条']);
+            return json(['code' => 0, 'msg' => '批量修改解析线路，成功' . $success . '条，失败' . $fail . '条' . DmtaskSyncService::message($synced, $notices)]);
         }
     }
 
@@ -1049,14 +1070,19 @@ class Domain extends BaseController
 
             $success = 0;
             $fail = 0;
+            $synced = 0;
+            $notices = [];
             foreach ($list as $record) {
                 if ($name == '@' && ($record['Type'] == 'NS' || $record['Type'] == 'SOA')) continue;
-                
+
                 if ($ttl > 0) $record['TTL'] = $ttl;
                 if ($mx > 0) $record['MX'] = $mx;
                 $recordid = $dns->updateDomainRecord($record['RecordId'], $record['Name'], $type, $value, $record['Line'], $record['TTL'], $record['MX'], $record['Weight'], $record['Remark']);
                 if ($recordid) {
                     if (is_array($record['Value'])) $record['Value'] = implode(',', $record['Value']);
+                    [$count, $taskNotices] = $this->sync_dmtask($drow, $record['RecordId'], ['type' => $type, 'value' => $value, 'old_value' => $record['Value'], 'ttl' => $record['TTL']], $recordid);
+                    $synced += $count;
+                    $notices = array_merge($notices, $taskNotices);
                     $this->add_log($drow['name'], '修改解析', $record['Name'].' ['.$record['Type'].'] '.$record['Value'].' → '.$record['Name'].' ['.$type.'] '.$value.' (线路:'.$record['Line'].' TTL:'.$record['TTL'].')');
                     $success++;
                 } else {
@@ -1064,7 +1090,7 @@ class Domain extends BaseController
                 }
             }
             if ($success > 0) {
-                return json(['code' => 0, 'msg' => '成功修改' . $success . '条解析记录']);
+                return json(['code' => 0, 'msg' => '成功修改' . $success . '条解析记录' . DmtaskSyncService::message($synced, $notices)]);
             } elseif($fail > 0) {
                 return json(['code' => -1, 'msg' => $dns->getError()]);
             } else {
@@ -1224,6 +1250,18 @@ class Domain extends BaseController
             ];
         }
         return json(['code' => 0, 'data' => $groupList]);
+    }
+
+    // 解析记录修改后同步关联的容灾切换策略，返回 [同步策略数, 提示信息]
+    private function sync_dmtask($drow, $recordid, array $change, $result = null, $target = null)
+    {
+        // 部分DNS平台修改记录会重建记录并返回新的记录ID
+        if (is_string($result) && $result !== '' && $result != $recordid) $change['recordid'] = $result;
+        if (isset($change['line']) && !isset($change['linename'])) {
+            $recordLine = cache('record_line_' . $drow['id']);
+            $change['linename'] = $recordLine[$change['line']]['name'] ?? $change['line'];
+        }
+        return DmtaskSyncService::recordUpdated($drow['id'], $recordid, $change, $target);
     }
 
     private function add_log($domain, $action, $data)

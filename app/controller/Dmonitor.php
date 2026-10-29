@@ -293,6 +293,9 @@ class Dmonitor extends BaseController
         } elseif ($action == 'setactive') {
             $id = input('post.id/d');
             $active = input('post.active/d');
+            if ($active == 1 && DmtaskUtils::isRecordDeleted(Db::name('dmtask')->where('id', $id)->value('recordinfo'))) {
+                return json(['code' => -1, 'msg' => '关联的解析记录已删除，请先修改策略重新选择解析记录']);
+            }
             Db::name('dmtask')->where('id', $id)->update(['active' => $active]);
             return json(['code' => 0, 'msg' => '设置成功']);
         } elseif ($action == 'del') {
@@ -303,7 +306,12 @@ class Dmonitor extends BaseController
         } elseif ($action == 'operation') {
             $ids = input('post.ids');
             $success = 0;
+            $skipped = 0;
             foreach ($ids as $id) {
+                if (input('post.act') == 'open' && DmtaskUtils::isRecordDeleted(Db::name('dmtask')->where('id', $id)->value('recordinfo'))) {
+                    $skipped++;
+                    continue;
+                }
                 if (input('post.act') == 'delete') {
                     Db::name('dmtask')->where('id', $id)->delete();
                     Db::name('dmlog')->where('taskid', $id)->delete();
@@ -317,7 +325,7 @@ class Dmonitor extends BaseController
                     $success++;
                 }
             }
-            return json(['code' => 0, 'msg' => '成功操作' . $success . '个容灾切换策略']);
+            return json(['code' => 0, 'msg' => '成功操作' . $success . '个容灾切换策略' . ($skipped > 0 ? '，' . $skipped . '个策略的解析记录已删除，未开启' : '')]);
         } else {
             return json(['code' => -1, 'msg' => '参数错误']);
         }

@@ -310,7 +310,8 @@ $(document).ready(function(){
 						   + '<span class="mx-priority"> | '+row.MX+'</span>';
 				   } else {
 					   return '<span id="'+copyId+'" data-value="'+htmlEscape(value)+'">'+htmlEscape(value)+'</span>'
-						   + '<a href="javascript:void(0);" title="复制记录值" onclick="copyToClipboard(null, \'#'+copyId+'\')" style="padding-left:6px;"><i class=\"fa fa-copy\"></i></a>';
+						   + '<a href="javascript:void(0);" title="复制记录值" onclick="copyToClipboard(null, \'#'+copyId+'\')" style="padding-left:6px;"><i class=\"fa fa-copy\"></i></a>'
+						   + dmtaskBadge(row);
 				   }
 			   }
 		   },
@@ -478,17 +479,49 @@ function editframe(recordid){
 	$("#form-store input[name=remark]").val(row.Remark);
 	$("#form-store").data("bootstrapValidator").resetForm();
 }
+// 关联容灾切换策略的记录在记录值后显示标识
+function dmtaskBadge(row){
+	if(!row.Dmtask) return '';
+	var switched = row.Dmtask.switched;
+	var style = switched ? 'background:#c2410c;color:#fff' : 'background:#e6ecf7;color:#173a7a';
+	var title = '关联' + row.Dmtask.count + '条容灾切换策略' + (switched ? '，当前已切换到备用' : '') + '，修改记录会同步更新策略';
+	return '<a href="/dmonitor/task?kw=' + encodeURIComponent(row.Name) + '" target="_blank" title="' + title + '" style="' + style + ';margin-left:8px;padding:0 6px;border-radius:3px;font-size:12px;text-decoration:none;white-space:nowrap">容灾' + (switched ? '·已切备用' : '') + '</a>';
+}
 function save(){
 	$("#form-store").data("bootstrapValidator").validate();
 	if(!$("#form-store").data("bootstrapValidator").isValid()){
 		return;
 	}
 	var act = $("#form-store input[name=action]").val();
+	var data = $("#form-store").serialize();
+	if(act == 'update'){
+		// 策略已切换到备用时，记录值的用途需由用户确认
+		var row = $("#listTable").bootstrapTable('getRowByUniqueId', $("#form-store input[name=recordid]").val());
+		var oldValue = row ? (Array.isArray(row.Value) ? row.Value.join(',') : String(row.Value)) : '';
+		var newValue = $.trim($("#form-store input[name=value]").val());
+		if(row && row.Dmtask && row.Dmtask.switched && newValue != oldValue){
+			layer.confirm('该记录关联的容灾切换策略当前<b>已切换到备用</b>，本次修改的记录值作为：<br/><br/>· <b>新主值</b>：策略恢复为正常状态，主值检测失败时会再次切换到备用<br/>· <b>新备用值</b>：保持已切换状态', {
+				title: '同步容灾切换策略', icon: 3, area: ['420px'],
+				btn: ['新主值', '新备用值', '取消'],
+				btn3: function(index){ layer.close(index); }
+			}, function(index){
+				layer.close(index);
+				submitStore(act, data + '&dm_target=main');
+			}, function(index){
+				layer.close(index);
+				submitStore(act, data + '&dm_target=backup');
+			});
+			return;
+		}
+	}
+	submitStore(act, data);
+}
+function submitStore(act, data){
 	var ii = layer.load(2);
 	$.ajax({
 		type : 'POST',
 		url : '/record/'+act+'/{$domainId}',
-		data : $("#form-store").serialize(),
+		data : data,
 		dataType : 'json',
 		success : function(data) {
 			layer.close(ii);
@@ -529,7 +562,8 @@ function setStatus(recordid, status){
 }
 function delItem(recordid) {
 	var row = $("#listTable").bootstrapTable('getRowByUniqueId', recordid);
-	layer.confirm('确定要删除此解析记录吗？', {title: '提示', icon: 0}, function(){
+	var tip = row && row.Dmtask ? '<br/>该记录关联' + row.Dmtask.count + '条容灾切换策略，删除后这些策略将停止运行。' : '';
+	layer.confirm('确定要删除此解析记录吗？' + tip, {title: '提示', icon: 0}, function(){
 	  var ii = layer.load(2);
 	  $.ajax({
 		type : 'POST',
@@ -755,7 +789,9 @@ function operation(action){
 		return;
 	}
 
-	layer.confirm('确定要'+(action=='open'?'启用':(action=='pause'?'暂停':'删除'))+'所选记录吗？', {title: '提示', icon: 0}, function(){
+	var linked = action == 'delete' ? rows.filter(function(row){ return row.Dmtask; }).reduce(function(sum, row){ return sum + row.Dmtask.count; }, 0) : 0;
+	var tip = linked > 0 ? '<br/>所选记录关联' + linked + '条容灾切换策略，删除后这些策略将停止运行。' : '';
+	layer.confirm('确定要'+(action=='open'?'启用':(action=='pause'?'暂停':'删除'))+'所选记录吗？' + tip, {title: '提示', icon: 0}, function(){
 	  var ii = layer.load(2);
 	  $.ajax({
 		type : 'POST',

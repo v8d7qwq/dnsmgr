@@ -251,7 +251,9 @@ class OptimizeService
         });
         if (!empty($cname_records)) {
             foreach ($cname_records as $record) {
-                $dns->deleteDomainRecord($record['RecordId']);
+                if ($dns->deleteDomainRecord($record['RecordId'])) {
+                    DmtaskSyncService::recordDeleted($row['did'], $record['RecordId']);
+                }
             }
         }
 
@@ -281,6 +283,7 @@ class OptimizeService
                         if (!$res) {
                             throw new Exception('修改解析失败，'.$dns->getError());
                         }
+                        DmtaskSyncService::recordUpdated($row['did'], $record['RecordId'], ['type' => $ip_type == 'v6' ? 'AAAA' : 'A', 'value' => $add_ip, 'old_value' => $record['Value']]);
                         $this->change_num++;
                         $correct_count++;
                     } else {
@@ -288,6 +291,7 @@ class OptimizeService
                         if (!$res) {
                             throw new Exception('删除解析失败，'.$dns->getError());
                         }
+                        DmtaskSyncService::recordDeleted($row['did'], $record['RecordId']);
                         $this->del_num++;
                     }
                 }

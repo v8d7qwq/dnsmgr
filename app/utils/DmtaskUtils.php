@@ -109,6 +109,102 @@ class DmtaskUtils
     }
 
     /**
+     * 解析记录修改后计算关联策略需要同步的字段
+     * $change 可包含 recordid、rr、type、value、old_value、line、linename、ttl，未提供的字段不同步
+     * $target 仅在策略已切换到备用且记录值被修改时使用：main 设为新主值，backup 设为新备用值，null 不同步记录值
+     * @return array [$update, $notices]
+     */
+    public static function syncFromRecord(array $task, array $change, ?string $target = null): array
+    {
+        $update = [];
+        $notices = [];
+        if (isset($change['recordid']) && strval($change['recordid']) !== '' && $change['recordid'] != $task['recordid']) {
+            $update['recordid'] = strval($change['recordid']);
+        }
+        if (isset($change['rr']) && $change['rr'] !== '' && $change['rr'] != $task['rr']) {
+            $update['rr'] = $change['rr'];
+        }
+
+        $info = json_decode(strval($task['recordinfo']), true);
+        if (!is_array($info)) $info = [];
+        $newInfo = $info;
+        if (isset($change['line']) && strval($change['line']) !== '') {
+            $newInfo['Line'] = strval($change['line']);
+            if (isset($change['linename']) && $change['linename'] !== '') $newInfo['LineName'] = $change['linename'];
+        }
+        if (!empty($change['ttl'])) {
+            $newInfo['TTL'] = intval($change['ttl']);
+        }
+        if ($newInfo != $info) {
+            $update['recordinfo'] = json_encode($newInfo, JSON_UNESCAPED_UNICODE);
+        }
+
+        if (isset($change['type']) && $change['type'] !== '' && !in_array(strtoupper($change['type']), ['A', 'AAAA', 'CNAME'])) {
+            if ($task['active'] == 1) $update['active'] = 0;
+            $notices[] = '记录类型改为' . $change['type'] . '，已停止该策略';
+            return [$update, $notices];
+        }
+
+        if (!isset($change['value']) || $change['value'] === '') {
+            return [$update, $notices];
+        }
+        $value = $change['value'];
+        if ($task['type'] != 2 || $task['status'] != 1) {
+            // 未切换时记录值即主值
+            if ($value != $task['main_value']) {
+                if ($task['type'] == 2 && $value == $task['backup_value']) {
+                    $notices[] = '新记录值与备用值相同，未同步主值';
+                } else {
+                    $update['main_value'] = $value;
+                }
+            }
+            return [$update, $notices];
+        }
+
+        // 已切换到备用：此时记录值为备用值（或其展平IP），需由用户确认新值的用途
+        $changed = isset($change['old_value']) ? $value != $change['old_value'] : ($value != $task['backup_value'] && $value != $task['main_value']);
+        if (!$changed) {
+            return [$update, $notices];
+        }
+        if ($target === 'main') {
+            if ($value == $task['backup_value']) {
+                $notices[] = '新主值与备用值相同，未同步';
+            } else {
+                if ($value != $task['main_value']) $update['main_value'] = $value;
+                $update['status'] = 0;
+                $update['errcount'] = 0;
+                $notices[] = '已设为新主值，策略恢复为正常状态，主值检测失败时将再次切换';
+            }
+        } elseif ($target === 'backup') {
+            if ($value == $task['main_value']) {
+                $notices[] = '新备用值与主值相同，未同步';
+            } elseif ($value != $task['backup_value']) {
+                $update['backup_value'] = $value;
+            }
+        } else {
+            $notices[] = '策略当前已切换到备用，记录值未同步，请在容灾策略中确认主值和备用值';
+        }
+        return [$update, $notices];
+    }
+
+    /**
+     * 解析记录被删除后停止策略，并在 recordinfo 中标记
+     */
+    public static function markRecordDeleted(array $task): array
+    {
+        $info = json_decode(strval($task['recordinfo']), true);
+        if (!is_array($info)) $info = [];
+        $info['RecordDeleted'] = 1;
+        return ['active' => 0, 'recordinfo' => json_encode($info, JSON_UNESCAPED_UNICODE)];
+    }
+
+    public static function isRecordDeleted($recordinfo): bool
+    {
+        $info = json_decode(strval($recordinfo), true);
+        return is_array($info) && !empty($info['RecordDeleted']);
+    }
+
+    /**
      * 从 recordinfo 中取出线路名称
      */
     public static function lineName($recordinfo): string

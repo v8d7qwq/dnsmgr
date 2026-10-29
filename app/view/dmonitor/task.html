@@ -10,7 +10,6 @@
 .dm-stat b.dm-danger{color:#c9302c}.dm-stat b.dm-warning{color:#b45309}
 .dm-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .dm-toolbar input[name=kw]{flex:1 1 160px;min-width:140px}
-.dm-check{color:#444;white-space:nowrap}
 .dm-toolbar select{width:auto}
 #dm-list .fixed-table-toolbar .bs-bars{float:none;width:100%}
 #dm-list .bootstrap-table .fixed-table-container{border:none}
@@ -22,7 +21,7 @@
 .dm-group .fa-globe{color:#666;margin-right:6px}
 .dm-group b{font-weight:600;margin-right:8px}
 .dm-meta{color:#555;font-size:12px;margin-right:6px}
-.dm-isp{display:inline-flex;align-items:center;gap:5px;padding:1px 9px 1px 6px;border-radius:11px;font-size:12px;font-weight:600;line-height:18px;white-space:nowrap}
+.dm-isp{display:inline-flex;align-items:center;gap:5px;padding:0 9px 0 6px;border-radius:9px;font-size:12px;font-weight:600;line-height:18px;white-space:nowrap}
 .dm-isp>img{width:14px;height:14px;object-fit:contain;display:block}
 .dm-isp-mobile{background:#e3f1fa;color:#00578f}
 .dm-isp-telecom{background:#e6ecf7;color:#173a7a}
@@ -33,20 +32,21 @@
 .dm-tag-orange{background:#c2410c;color:#fff}
 .dm-tag-blue{background:#1d4ed8;color:#fff}
 .dm-tag-amber{background:#fde68a;color:#713f12}
-.dm-tag-gray{background:#e5e7eb;color:#374151}.dm-mono{font-family:Menlo,Consolas,monospace;white-space:nowrap}
-.dm-muted{color:#555}
-.dm-strong{font-weight:600;color:#c9302c}
-.dm-val{display:flex;align-items:center;white-space:nowrap}
-.dm-val+.dm-val{margin-top:3px}
-.dm-val-main{font-size:13px;color:#1f2329}
-.dm-val-backup{font-size:12px;color:#555}
-.dm-k{flex:none;width:16px;height:16px;margin-right:6px;border-radius:3px;font-size:11px;line-height:16px;text-align:center;font-family:inherit;background:#eceef1;color:#444}
-.dm-val.dm-live .dm-k{background:#1f4e8c;color:#fff}
-.dm-val-backup.dm-live{color:#b42318;font-weight:600}
-.dm-val-backup.dm-live .dm-k{background:#c2410c}
-.dm-val-main.dm-idle{color:#6b7280}
-.dm-rr{color:#555;margin-right:6px}
+.dm-tag-gray{background:#e5e7eb;color:#374151}
+.dm-mono{font-family:Menlo,Consolas,monospace;white-space:nowrap}
+/* 两行排版：第一行主要信息，第二行次要信息，各列行高一致 */
+.dm-l1,.dm-l2{display:flex;align-items:center;min-height:18px;line-height:18px;white-space:nowrap}
+.dm-l1{font-size:13px;color:#1f2329}
+.dm-l2{font-size:12px;color:#555;margin-top:3px}
+.dm-k{flex:none;width:16px;height:16px;margin-right:6px;border-radius:3px;font-size:11px;font-weight:400;line-height:16px;text-align:center;font-family:inherit;background:#eceef1;color:#444}
+.dm-main .dm-mono{font-weight:700}
+.dm-live .dm-k{background:#1f4e8c;color:#fff}
+.dm-backup.dm-live{color:#b42318;font-weight:600}
+.dm-backup.dm-live .dm-k{background:#c2410c}
+.dm-main.dm-idle{color:#6b7280}
+.dm-rr{color:#555;margin-right:6px;font-weight:400}
 .dm-extra{margin-left:6px;font-size:11px;color:#555;font-weight:400}
+.dm-sep{margin:0 5px;color:#9aa0a6}
 .dm-flap{color:#b45309}
 .dm-more{color:#555;padding:2px 8px;font-size:16px}
 .dm-more:hover{color:#333}
@@ -177,19 +177,29 @@ function lineTag(row){
 	if(host.isp) return '<span class="dm-isp dm-isp-' + host.isp + '" title="' + esc(tip) + '"><img src="/static/images/isp/' + ISPS[host.isp].logo + '" alt="">' + ISPS[host.isp].name + '</span>';
 	return '<span class="dm-isp dm-isp-other" title="' + esc(tip) + '">' + esc(host.line) + '</span>';
 }
-// 当前状态标签：已暂停/检测异常为红色，已切换备用为橙色
+// 当前状态标签，仅在非正常状态时显示：已暂停/检测异常为红色，已切换备用为橙色
 function stateTags(row){
-	var html = '';
-	if(row.type == 1){
-		if(row.status == 1) html += '<span class="dm-tag dm-tag-red">已暂停</span>';
-	}else if(row.type == 2){
-		if(row.status == 1) html += '<span class="dm-tag dm-tag-orange">已切备用</span>';
-	}else if(row.type == 3){
-		html += row.status == 1 ? '<span class="dm-tag dm-tag-blue">已开启</span>' : '<span class="dm-tag dm-tag-gray">条件开启</span>';
-	}else{
-		html += row.status == 1 ? '<span class="dm-tag dm-tag-red">检测异常</span>' : '<span class="dm-tag dm-tag-gray">仅告警</span>';
-	}
-	return html;
+	if(recordDeleted(row)) return '<span class="dm-tag dm-tag-red" title="解析记录已删除，策略已停止，请修改策略重新选择解析记录">记录已删除</span>';
+	if(row.status != 1) return '';
+	if(row.type == 1) return '<span class="dm-tag dm-tag-red">已暂停</span>';
+	if(row.type == 2) return '<span class="dm-tag dm-tag-orange">已切备用</span>';
+	if(row.type == 3) return '<span class="dm-tag dm-tag-blue">已开启</span>';
+	return '<span class="dm-tag dm-tag-red">检测异常</span>';
+}
+// 无备用记录的策略在第二行说明切换方式
+function typeText(row){
+	if(row.type == 1) return '故障时暂停解析';
+	if(row.type == 3) return '同域名正常 ≤ ' + esc(row.cycle) + ' 条时开启解析';
+	return '仅告警，不修改解析';
+}
+function recordDeleted(row){
+	try { return !!JSON.parse(row.recordinfo || '{}').RecordDeleted; } catch(e) { return false; }
+}
+function twoLines(l1, l2, tip){
+	return '<div' + (tip ? ' title="' + esc(tip) + '"' : '') + '><div class="dm-l1">' + l1 + '</div><div class="dm-l2">' + l2 + '</div></div>';
+}
+function urlHost(url){
+	try { return new URL(url).host; } catch(e) { return url; }
 }
 
 $(document).ready(function(){
@@ -230,14 +240,14 @@ $(document).ready(function(){
 				field: 'linename',
 				title: '线路',
 				formatter: function(value, row, index) {
-					return lineTag(row);
+					return twoLines(lineTag(row), 'ID ' + row.id);
 				}
 			},
 			{
 				field: 'main_value',
 				title: '主值 / 备用',
 				formatter: function(value, row, index) {
-					// 主值、备用分两行显示，当前生效的一行标签填充高亮
+					// 第一行主值（加粗），第二行备用值或切换方式；当前生效的一行标签填充高亮
 					var rr = hostParts(row).showRr ? '<span class="dm-rr">' + esc(row.rr) + '</span>' : '';
 					var hasBackup = row.type == 2;
 					var onBackup = hasBackup && row.status == 1;
@@ -245,59 +255,66 @@ $(document).ready(function(){
 					if(hasBackup) mainState = onBackup ? ' dm-idle' : ' dm-live';
 					else if((row.type == 1 && row.status == 1) || (row.type == 3 && row.status == 0)) mainState = ' dm-idle';
 					var mainTip = hasBackup ? (onBackup ? '主值（当前未生效）' : '主值（当前生效）') : '解析记录值';
-					var html = '<div class="dm-val dm-val-main' + mainState + '" title="' + mainTip + '"><span class="dm-k">主</span>' + rr + '<span class="dm-mono">' + esc(value) + '</span>' + stateTags(row) + '</div>';
+					var html = '<div class="dm-l1 dm-main' + mainState + '" title="' + mainTip + '"><span class="dm-k">主</span>' + rr + '<span class="dm-mono">' + esc(value) + '</span>' + stateTags(row) + '</div>';
 					if(hasBackup){
 						var backup = esc(row.backup_value);
 						if(backup.length > 28) backup = '<span title="' + backup + '">' + backup.substring(0, 24) + '…</span>';
 						var extra = '';
 						if(row.cname_flatten == 1) extra += '<span class="dm-extra" title="切换时将备用CNAME展平为A记录">展平</span>';
 						if(row.cdn == 1) extra += '<span class="dm-extra" title="切换时开启Cloudflare代理">CF代理</span>';
-						html += '<div class="dm-val dm-val-backup' + (onBackup ? ' dm-live' : '') + '" title="' + (onBackup ? '备用（当前生效）' : '备用（故障时切换）') + '"><span class="dm-k">备</span><span class="dm-mono">' + backup + '</span>' + extra + '</div>';
+						html += '<div class="dm-l2 dm-backup' + (onBackup ? ' dm-live' : '') + '" title="' + (onBackup ? '备用（当前生效）' : '备用（故障时切换）') + '"><span class="dm-k">备</span><span class="dm-mono">' + backup + '</span>' + extra + '</div>';
+					}else{
+						html += '<div class="dm-l2"><span class="dm-k" style="visibility:hidden">备</span>' + typeText(row) + '</div>';
 					}
 					return html;
 				}
 			},
 			{
 				field: 'checktype',
-				title: '检测目标/代理',
+				title: '检测目标 / 代理',
 				formatter: function(value, row, index) {
-					if(row.type > 2) return '<span class="dm-muted">同域名正常数量 ≤ ' + esc(row.cycle) + '</span>';
+					if(row.type > 2) return twoLines('无需检测', '按同域名暂停策略的状态判断');
 					var target;
 					if(value == 1) target = 'TCP ' + (row.checkurl ? esc(row.checkurl) + ':' : '') + esc(row.tcpport);
-					else if(value == 2) target = '<span title="' + esc(row.checkurl) + '">HTTP(S)</span>';
+					else if(value == 2) target = 'HTTP(S) ' + esc(urlHost(row.checkurl));
 					else target = 'PING' + (row.checkurl ? ' ' + esc(row.checkurl) : '');
 					var via;
-					if(value == 1) via = row.proxy_name ? esc(row.proxy_name) : '直连';
+					if(value == 1) via = row.proxy_name ? '<i class="fa fa-random" style="margin-right:4px"></i>' + esc(row.proxy_name) : '直连';
 					else if(value == 2) via = row.proxy == 1 ? '代理' : '直连';
 					else via = '直连';
-					var tip = '每' + row.frequency + '秒检测' + (value > 0 ? '，超时' + row.timeout + '秒' : '') + '\n上次检测：' + row.checktimestr;
-					return '<span class="dm-check" title="' + esc(tip) + '">' + target + ' · ' + via + '</span>';
+					var sep = '<span class="dm-sep">·</span>';
+					var l2 = via + sep + '每' + row.frequency + '秒' + (value > 0 ? sep + '超时' + row.timeout + '秒' : '');
+					var tip = (value == 2 ? row.checkurl + '\n' : '') + '上次检测：' + row.checktimestr;
+					return twoLines(target, l2, tip);
 				}
 			},
 			{
 				field: 'errcount',
-				title: '连续失败/阈值',
+				title: '连续失败 / 阈值',
 				formatter: function(value, row, index) {
-					if(row.type > 2 || row.active != 1) return '<span class="dm-muted">—</span>';
+					if(row.active != 1) return twoLines('—', '未运行');
+					if(row.type > 2) return twoLines('—', '无需检测');
 					var count = parseInt(value) || 0;
-					var text = (row.status == 1 ? '恢复 ' : '') + count + ' / ' + row.cycle;
+					var l1 = '<span class="' + (count > 0 ? 'dm-flap' : '') + '">' + count + ' / ' + row.cycle + '</span>';
 					var tip = row.status == 1 ? '连续检测成功次数，达到阈值后恢复' : '连续检测失败次数，达到阈值后切换';
-					return '<span class="' + (count > 0 ? 'dm-flap' : '') + '" title="' + tip + '">' + text + '</span>';
+					return twoLines(l1, row.status == 1 ? '恢复确认' : '连续失败', tip);
 				}
 			},
 			{
 				field: 'switch_count',
-				title: '7天切换次数',
+				title: '7天切换 / 最近',
 				formatter: function(value, row, index) {
-					var tip = '最近切换：' + row.switchtimestr;
-					if(row.flapping == 1) return '<a href="/dmonitor/task/info/' + row.id + '" class="dm-flap" title="' + esc(tip) + '，切换频繁">' + value + ' 次</a>';
-					if(value == 0) return '<span class="dm-muted" title="' + esc(tip) + '">0 次</span>';
-					return '<a href="/dmonitor/task/info/' + row.id + '" title="' + esc(tip) + '">' + value + ' 次</a>';
+					var l1;
+					if(row.flapping == 1) l1 = '<a href="/dmonitor/task/info/' + row.id + '" class="dm-flap" title="切换频繁，点击查看切换日志">' + value + ' 次</a>';
+					else if(value == 0) l1 = '0 次';
+					else l1 = '<a href="/dmonitor/task/info/' + row.id + '" title="查看切换日志">' + value + ' 次</a>';
+					var last = row.switchtime > 0 ? '最近 ' + esc(row.switchtimestr.substring(5, 16)) : '从未切换';
+					return twoLines(l1, last, row.switchtime > 0 ? '最近切换：' + row.switchtimestr : '');
 				}
 			},
 			{
 				field: 'active',
-				title: '运行开关',
+				title: '运行',
 				formatter: function(value, row, index) {
 					var checked = value == 1;
 					return '<div class="material-switch" title="' + (checked ? '运行中，点击停止' : '已停止，点击开启') + '"><input id="active' + row.id + '" type="checkbox"' + (checked ? ' checked' : '') + ' onchange="setActive(' + row.id + ',' + (checked ? 0 : 1) + ')"/><label for="active' + row.id + '" class="label-primary"></label></div>';
@@ -413,7 +430,8 @@ function setActive(id, active){
 			layer.msg('修改成功', {icon: 1, time:800});
 			reloadAll();
 		} else {
-			layer.msg(data.msg, {icon: 2});
+			layer.alert(data.msg, {icon: 2});
+			searchRefresh();
 		}
 	}, 'json');
 }
