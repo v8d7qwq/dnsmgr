@@ -62,7 +62,9 @@ class Dmonitor extends BaseController
 
         $select = Db::name('dmtask')->alias('A')->join('domain B', 'A.did = B.id');
         if (!empty($kw)) {
-            if ($type == 1) {
+            if ($type == 0) {
+                $select->whereLike('A.rr|B.name|A.main_value|A.backup_value|A.remark', '%' . $kw . '%');
+            } elseif ($type == 1) {
                 $select->whereLike('rr|B.name', '%' . $kw . '%');
             } elseif ($type == 2) {
                 $select->where('recordid', $kw);

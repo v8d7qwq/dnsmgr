@@ -2,28 +2,46 @@
 {block name="title"}容灾切换策略{/block}
 {block name="main"}
 <style>
-tbody tr>td.dm-host{vertical-align:middle;background:#fafbfc}
-tbody tr.dm-group-start>td{border-top:2px solid #dfe3e8}
-.dm-stats{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
-.dm-stat{flex:1 1 130px;display:block;padding:10px 14px;border:1px solid #e5e8eb;border-radius:4px;color:#6c757d;text-decoration:none!important}
-.dm-stat:hover,.dm-stat.active{border-color:#3c8dbc;background:#f5f9fc;color:#6c757d}
-.dm-stat b{display:block;font-size:22px;font-weight:500;color:#333;line-height:1.3}
-.dm-stat .text-danger{color:#d9534f}.dm-stat .text-warning{color:#e08e0b}
-.dm-value{white-space:nowrap}
-.dm-value .dm-off{color:#aaa}
-.dm-value .dm-on{font-weight:600}
-.dm-sub{color:#999;font-size:12px}
-.dm-progress{display:inline-block;width:46px;height:6px;background:#eee;border-radius:3px;vertical-align:middle;margin-right:4px;overflow:hidden}
-.dm-progress>i{display:block;height:100%;background:#f0ad4e}
-.dm-actions{white-space:nowrap}
-.dm-actions>.btn{margin-right:4px}
+.dm-stats{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.dm-stat{flex:1 1 150px;display:block;padding:10px 14px;background:#f5f6f8;border:1px solid transparent;border-radius:6px;color:#777;text-decoration:none!important}
+.dm-stat:hover,.dm-stat.active{border-color:#c9d6e3;color:#777}
+.dm-stat>span{font-size:12px}
+.dm-stat b{display:block;font-size:22px;font-weight:500;color:#333;line-height:1.35}
+.dm-stat b.dm-danger{color:#c9302c}.dm-stat b.dm-warning{color:#d58512}
+.dm-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dm-toolbar input[name=kw]{flex:1 1 160px;min-width:140px}
+.dm-check{color:#999;white-space:nowrap}
+.dm-toolbar select{width:auto}
+#dm-list .fixed-table-toolbar .bs-bars{float:none;width:100%}
+#dm-list .bootstrap-table .fixed-table-container{border:none}
+#dm-list .table{margin-bottom:0}
+#dm-list .table>thead>tr>th{border-bottom:1px solid #eef0f2;color:#999;font-size:12px;font-weight:400}
+#dm-list .table>tbody>tr>td{border-top:1px solid #eef0f2;vertical-align:middle;font-size:13px;padding:8px 10px}
+#dm-list .table>tbody>tr.dm-group>td{background:#f5f6f8;border-top:12px solid #fff;padding:9px 12px;font-size:14px}
+#dm-list .table>tbody>tr.dm-group:first-child>td{border-top:none}
+.dm-group .fa-globe{color:#888;margin-right:6px}
+.dm-group b{font-weight:600;margin-right:8px}
+.dm-meta{color:#999;font-size:12px;margin-right:6px}
+.dm-pill{display:inline-block;min-width:44px;text-align:center;font-size:12px;padding:1px 8px;border-radius:4px;white-space:nowrap}
+.dm-pill-ok{background:#e7f4e4;color:#2f6f22}
+.dm-pill-bad{background:#fbe6e6;color:#a32d2d}
+.dm-pill-warn{background:#fcf1dc;color:#8a5a0b}
+.dm-pill-off{background:#eee;color:#777}
+.dm-mono{font-family:Menlo,Consolas,monospace;white-space:nowrap}
+.dm-muted{color:#999}
+.dm-strong{font-weight:600;color:#c9302c}
+.dm-flap{color:#d58512}
+.dm-more{color:#888;padding:2px 8px;font-size:16px}
+.dm-more:hover{color:#333}
+#dm-list td .dropdown-menu{font-size:13px;min-width:120px}
+@media (min-width:768px){#dm-list .fixed-table-body{overflow:visible}}
 </style>
 <div class="modal" id="modal-batchedit">
 	<div class="modal-dialog" role="document">
 		<div class="modal-content">
 			<div class="modal-header">
 				<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-				<h4 class="modal-title">批量修改参数</h4>
+				<h4 class="modal-title">批量改参数</h4>
 			</div>
 			<div class="modal-body">
 				<form id="form-batchedit" onsubmit="return false;" class="form-horizontal">
@@ -64,44 +82,32 @@ tbody tr.dm-group-start>td{border-top:2px solid #dfe3e8}
 <div class="row">
 	<div class="col-xs-12 center-block" style="float: none;">
 	<div class="panel panel-default panel-intro">
-	<div class="panel-body">
+	<div class="panel-body" id="dm-list">
 
 <div class="dm-stats">
-	<a href="javascript:statFilter('all')" class="dm-stat" data-stat="all"><span>全部策略</span><b id="stat-total">-</b></a>
-	<a href="javascript:statFilter('running')" class="dm-stat" data-stat="running"><span>运行中</span><b id="stat-running">-</b></a>
-	<a href="javascript:statFilter('abnormal')" class="dm-stat" data-stat="abnormal"><span>异常（已切换/暂停）</span><b id="stat-abnormal" class="text-danger">-</b></a>
-	<a href="javascript:statFilter('inactive')" class="dm-stat" data-stat="inactive"><span>已停止运行</span><b id="stat-inactive">-</b></a>
-	<a href="javascript:statFilter('flap')" class="dm-stat" data-stat="flap"><span id="stat-flap-label">频繁抖动</span><b id="stat-flap" class="text-warning">-</b></a>
-	<a href="javascript:cleanOrphan()" class="dm-stat" title="已删除策略遗留的切换记录，点击清理"><span>孤儿切换记录 <i class="fa fa-trash"></i></span><b id="stat-orphan">-</b></a>
+	<a href="javascript:statFilter('')" class="dm-stat" data-state="" title="点击查看全部策略"><span>运行中 / 全部</span><b><span id="stat-running">-</span> / <span id="stat-total">-</span></b></a>
+	<a href="javascript:statFilter('abnormal')" class="dm-stat" data-state="abnormal" title="当前已切换到备用记录、已暂停解析或检测异常的策略"><span>当前在备用 / 暂停</span><b id="stat-abnormal" class="dm-danger">-</b></a>
+	<a href="javascript:statFilter('flap')" class="dm-stat" data-state="flap"><span id="stat-flap-label">7天内频繁抖动</span><b id="stat-flap" class="dm-warning">-</b></a>
+	<a href="javascript:cleanOrphan()" class="dm-stat" title="已删除策略遗留的切换记录，点击清理"><span>孤儿日志 <i class="fa fa-trash-o"></i></span><b id="stat-orphan">-</b></a>
 </div>
 
-<form onsubmit="return searchSubmit()" method="GET" class="form-inline" id="searchToolbar">
-  <div class="form-group">
-	<label>搜索</label>
-	<div class="form-group">
-		<select name="type" class="form-control"><option value="1">域名</option><option value="3">解析记录</option><option value="4">备用解析记录</option><option value="2">解析记录ID</option><option value="5">备注</option></select>
+<form onsubmit="return searchSubmit()" method="GET" class="dm-toolbar" id="searchToolbar">
+	<input type="hidden" name="type" value="0">
+	<input type="text" class="form-control" name="kw" placeholder="ly.cm / 123.253.227.22">
+	<select name="state" class="form-control" onchange="searchSubmit()">
+		<option value="">全部状态</option>
+		<option value="abnormal">在备用 / 暂停</option>
+		<option value="flap">抖动</option>
+		<option value="running">运行中</option>
+		<option value="inactive">已停用</option>
+	</select>
+	<button type="submit" class="btn btn-default" title="搜索"><i class="fa fa-search"></i></button>
+	<a href="/dmonitor/task/add" class="btn btn-default"><i class="fa fa-copy"></i> 按线路批量添加</a>
+	<a href="javascript:batchEdit()" class="btn btn-default"><i class="fa fa-sliders"></i> 批量改参数</a>
+	<div class="btn-group" role="group">
+		<button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">更多 <span class="caret"></span></button>
+		<ul class="dropdown-menu dropdown-menu-right"><li><a href="javascript:operation('open')">开启运行</a></li><li><a href="javascript:operation('close')">停止运行</a></li><li><a href="javascript:operation('retry')">立即重试</a></li><li role="separator" class="divider"></li><li><a href="javascript:operation('delete')">删除</a></li></ul>
 	</div>
-  </div>
-  <div class="form-group">
-	<input type="text" class="form-control" name="kw" placeholder="">
-  </div>
-  <div class="form-group">
-	<div class="form-group">
-		<select name="status" class="form-control"><option value="">健康状况</option><option value="0">正常</option><option value="1">异常</option></select>
-	</div>
-  </div>
-  <div class="form-group">
-	<select name="active" class="form-control"><option value="">运行开关</option><option value="1">运行中</option><option value="0">已停止</option></select>
-  </div>
-  <input type="hidden" name="flap" value="">
-  <button type="submit" class="btn btn-primary"><i class="fa fa-search"></i> 搜索</button>
-  <a href="javascript:searchClear()" class="btn btn-default" title="刷新域名账户列表"><i class="fa fa-refresh"></i> 刷新</a>
-  <a href="/dmonitor/task/add" class="btn btn-success"><i class="fa fa-plus"></i> 添加</a>
-  <a href="javascript:toggleGroup()" class="btn btn-default" id="btn-group"><i class="fa fa-object-group"></i> 按主机分组</a>
-  <div class="btn-group" role="group">
-	<button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">批量操作 <span class="caret"></span></button>
-	<ul class="dropdown-menu"><li><a href="javascript:batchEdit()">修改参数</a></li><li><a href="javascript:operation('open')">开启运行</a></li><li><a href="javascript:operation('close')">停止运行</a></li><li><a href="javascript:operation('retry')">立即重试</a></li><li><a href="javascript:operation('delete')">删除</a></li></ul>
-  </div>
 </form>
 
       <table id="listTable">
@@ -117,47 +123,62 @@ tbody tr.dm-group-start>td{border-top:2px solid #dfe3e8}
 <script src="/static/js/bootstrap-table-page-jump-to-1.21.4.min.js"></script>
 <script src="/static/js/custom.js?v=1006"></script>
 <script>
-const groupModeKey = 'dmtask_group';
-var groupMode = (function(){
-	try { return localStorage.getItem(groupModeKey) !== '0'; } catch(e) { return true; }
-})();
+const ISP_NAMES = {cm: '移动', yd: '移动', ct: '电信', dx: '电信', cu: '联通', lt: '联通'};
 
 function esc(value){
 	return $('<div>').text(value == null ? '' : String(value)).html();
 }
-// 当前状态的含义随切换设置不同
-function stateLabel(row){
-	if(row.status == 0){
-		if(row.type == 3) return '<span class="label label-default">未开启</span>';
-		return '<span class="label label-success">正常</span>';
-	}
-	if(row.type == 1) return '<span class="label label-danger">已暂停解析</span>';
-	if(row.type == 2) return '<span class="label label-danger">已切换备用</span>';
-	if(row.type == 3) return '<span class="label label-warning">已开启解析</span>';
-	return '<span class="label label-danger">异常</span>';
+// 主机记录末段为运营商简写（如 ly.cm）时按前缀分组并以运营商作为线路，其余按主域名分组
+function hostParts(row){
+	var labels = String(row.rr).split('.');
+	var isp = labels.length > 1 ? ISP_NAMES[labels[labels.length - 1].toLowerCase()] : null;
+	var prefix = isp ? labels.slice(0, -1).join('.') : '';
+	return {
+		key: row.did + '|' + prefix,
+		title: (prefix ? prefix + '.' : '') + row.domain,
+		line: isp || row.linename || '默认',
+		showRr: !isp,
+	};
+}
+function stateText(row){
+	if(row.status == 0) return row.type == 3 ? '未开启解析' : '正常';
+	if(row.type == 1) return '已暂停解析';
+	if(row.type == 2) return '已切换备用';
+	if(row.type == 3) return '已开启解析';
+	return '检测异常';
+}
+function pillClass(row){
+	if(row.status == 1) return row.type == 3 ? 'dm-pill-warn' : 'dm-pill-bad';
+	return row.active == 1 ? 'dm-pill-ok' : 'dm-pill-off';
 }
 
 $(document).ready(function(){
 	updateToolbar();
-	updateGroupButton();
+	updateStatActive();
 	loadStats();
 	const pageSizeKey = 'dmtask_pagesize';
 	const pageNumber = typeof window.$_GET['pageNumber'] != 'undefined' ? parseInt(window.$_GET['pageNumber']) : 1;
 	const pageSize = getStoredPageSize(pageSizeKey);
-	var urlSort = typeof window.$_GET['sortName'] != 'undefined' ? window.$_GET['sortName'] : undefined;
-	var urlOrder = typeof window.$_GET['sortOrder'] != 'undefined' ? window.$_GET['sortOrder'] : undefined;
 
 	$("#listTable").bootstrapTable({
 		url: '/dmonitor/task/data',
 		pageNumber: pageNumber,
 		pageSize: pageSize,
-		classes: 'table table-striped table-hover table-bordered',
-		sortReset: false,
-		sortName: urlSort,
-		sortOrder: urlOrder,
+		classes: 'table table-hover',
+		showColumns: false,
+		showToggle: false,
+		showFullscreen: false,
 		queryParams: function(params) {
 			params = $.fn.bootstrapTable.custom.queryParams(params);
-			params.group = groupMode ? 1 : 0;
+			// 状态筛选转换为接口参数
+			var state = params.state;
+			delete params.state;
+			delete params.sortName;
+			delete params.sortOrder;
+			params.status = state == 'abnormal' ? 1 : '';
+			params.active = state == 'running' ? 1 : (state == 'inactive' ? 0 : '');
+			params.flap = state == 'flap' ? 1 : '';
+			params.group = 1;
 			return params;
 		},
 		columns: [
@@ -166,204 +187,135 @@ $(document).ready(function(){
 				checkbox: true
 			},
 			{
-				field: 'id',
-				title: 'ID',
-				sortable: true
-			},
-			{
-				field: 'rr',
-				title: '域名',
-				sortable: true,
-				formatter: function(value, row, index) {
-					return '<span title="'+esc(row.remark)+'" data-toggle="tooltip" data-placement="right">' + esc(value) + '.' + esc(row.domain) + '</span>';
-				}
-			},
-			{
 				field: 'linename',
 				title: '线路',
 				formatter: function(value, row, index) {
-					return value ? esc(value) : '<span class="dm-sub">-</span>';
+					var host = hostParts(row);
+					var tip = row.rr + '.' + row.domain + '（ID ' + row.id + '）\nDNS线路：' + (row.linename || '-') + '\n状态：' + stateText(row) + (row.active == 1 ? '' : '，已停止运行');
+					return '<span class="dm-pill ' + pillClass(row) + '" title="' + esc(tip) + '">' + esc(host.line) + '</span>';
 				}
 			},
 			{
 				field: 'main_value',
-				title: '解析记录',
-				sortable: true,
+				title: '主值→备用',
 				formatter: function(value, row, index) {
+					var html = '<span class="dm-mono">';
+					if(hostParts(row).showRr) html += esc(row.rr) + ' ';
 					if(row.type == 2){
 						var onBackup = row.status == 1;
-						var extra = [];
-						if(row.cname_flatten == 1) extra.push('CNAME展平');
-						if(row.cdn == 1) extra.push('CF代理');
-						return '<span class="dm-value" title="当前生效：'+(onBackup?'备用':'主')+'记录" data-toggle="tooltip"><span class="'+(onBackup?'dm-off':'dm-on')+'">'+esc(value)+'</span> <i class="fa fa-long-arrow-right dm-sub"></i> <span class="'+(onBackup?'dm-on text-danger':'dm-off')+'">'+esc(row.backup_value)+'</span></span>' + (extra.length ? '<div class="dm-sub">'+extra.join('，')+'</div>' : '');
+						var backup = esc(row.backup_value);
+						if(backup.length > 16) backup = '<span title="' + backup + '">' + backup.substring(0, 12) + '…</span>';
+						html += '<span class="' + (onBackup ? 'dm-muted' : '') + '">' + esc(value) + '</span> <span class="' + (onBackup ? 'dm-strong' : 'dm-muted') + '">→ ' + backup + '</span>';
+						if(row.cname_flatten == 1) html += ' <span class="dm-muted" title="切换时将备用CNAME展平为A记录">展平</span>';
+						if(row.cdn == 1) html += ' <span class="dm-muted" title="切换时开启Cloudflare代理">CF</span>';
+					}else{
+						html += esc(value);
+						if(row.type == 0) html += ' <span class="dm-muted">仅告警</span>';
+						else if(row.type == 1 && row.status == 1) html += ' <span class="dm-muted">已暂停</span>';
+						else if(row.type == 3) html += ' <span class="dm-muted">' + (row.status == 1 ? '已开启' : '条件开启') + '</span>';
 					}
-					return '<span class="dm-value">'+esc(value)+'</span>';
-				}
-			},
-			{
-				field: 'type',
-				title: '切换设置',
-				sortable: true,
-				formatter: function(value, row, index) {
-					if(value == 1) {
-						return '暂停解析';
-					} else if(value == 2) {
-						return '切换备用';
-					} else if(value == 3) {
-						return '<span title="" data-toggle="tooltip" data-placement="bottom" data-original-title="同域名正常数量<='+esc(row.cycle)+'" class="tips">条件开启</span>';
-					} else {
-						return '仅告警';
-					}
+					return html + '</span>';
 				}
 			},
 			{
 				field: 'checktype',
-				title: '检测',
-				sortable: true,
+				title: '检测目标/代理',
 				formatter: function(value, row, index) {
-					if(row.type > 2) return '无';
-					var html;
-					if(value == 1) {
-						html = 'TCP ' + (row.checkurl ? esc(row.checkurl)+':' : '') + esc(row.tcpport);
-					} else if(value == 2) {
-						html = '<span title="" data-toggle="tooltip" data-placement="bottom" data-original-title="'+esc(row.checkurl)+'" class="tips">HTTP(S)</span>' + (row.proxy == 1 ? ' · 代理' : '');
-					} else {
-						html = 'PING' + (row.checkurl ? ' '+esc(row.checkurl) : '');
-					}
-					var sub = row.frequency + '秒';
-					if(value > 0) sub += ' · 超时' + row.timeout + '秒';
-					if(value == 1) sub += ' · ' + (row.proxy_name ? '<i class="fa fa-random"></i> '+esc(row.proxy_name) : '直连');
-					return html + '<div class="dm-sub">' + sub + '</div>';
+					if(row.type > 2) return '<span class="dm-muted">同域名正常数量 ≤ ' + esc(row.cycle) + '</span>';
+					var target;
+					if(value == 1) target = 'TCP ' + (row.checkurl ? esc(row.checkurl) + ':' : '') + esc(row.tcpport);
+					else if(value == 2) target = '<span title="' + esc(row.checkurl) + '">HTTP(S)</span>';
+					else target = 'PING' + (row.checkurl ? ' ' + esc(row.checkurl) : '');
+					var via;
+					if(row.active != 1) via = '停用';
+					else if(value == 1) via = row.proxy_name ? esc(row.proxy_name) : '直连';
+					else if(value == 2) via = row.proxy == 1 ? '代理' : '直连';
+					else via = '直连';
+					var tip = '每' + row.frequency + '秒检测' + (value > 0 ? '，超时' + row.timeout + '秒' : '') + '\n上次检测：' + row.checktimestr;
+					return '<span class="dm-check" title="' + esc(tip) + '">' + target + ' · ' + via + '</span>';
 				}
 			},
 			{
 				field: 'errcount',
-				title: '确认进度',
+				title: '连续失败/阈值',
 				formatter: function(value, row, index) {
-					if(row.type > 2) return '<span class="dm-sub">-</span>';
-					var cycle = Math.max(parseInt(row.cycle) || 1, 1);
+					if(row.type > 2 || row.active != 1) return '<span class="dm-muted">—</span>';
 					var count = parseInt(value) || 0;
-					var percent = Math.min(100, Math.round(count * 100 / cycle));
-					var text = (row.status == 1 ? '恢复 ' : '失败 ') + count + '/' + cycle;
-					return '<span title="'+(row.status == 1 ? '连续成功次数，达到后恢复' : '连续失败次数，达到后切换')+'" data-toggle="tooltip"><span class="dm-progress"><i style="width:'+percent+'%;'+(row.status == 1 ? 'background:#5cb85c' : '')+'"></i></span><span class="'+(count > 0 ? '' : 'dm-sub')+'">'+text+'</span></span>';
-				}
-			},
-			{
-				field: 'status',
-				title: '健康状况',
-				sortable: true,
-				formatter: function(value, row, index) {
-					return stateLabel(row);
+					var text = (row.status == 1 ? '恢复 ' : '') + count + ' / ' + row.cycle;
+					var tip = row.status == 1 ? '连续检测成功次数，达到阈值后恢复' : '连续检测失败次数，达到阈值后切换';
+					return '<span class="' + (count > 0 ? 'dm-flap' : '') + '" title="' + tip + '">' + text + '</span>';
 				}
 			},
 			{
 				field: 'switch_count',
-				title: '近7天切换',
+				title: '7天切换次数',
 				formatter: function(value, row, index) {
-					if(value == 0) return '<span class="dm-sub">0</span>';
-					var html = '<a href="/dmonitor/task/info/'+row.id+'">' + value + ' 次</a>';
-					if(row.flapping == 1) html = '<span class="label label-warning" title="切换频繁，建议检查网络或调整确认次数" data-toggle="tooltip">抖动</span> ' + html;
-					return html;
+					var tip = '最近切换：' + row.switchtimestr;
+					if(row.flapping == 1) return '<a href="/dmonitor/task/info/' + row.id + '" class="dm-flap" title="' + esc(tip) + '，切换频繁">' + value + ' 次</a>';
+					if(value == 0) return '<span class="dm-muted" title="' + esc(tip) + '">0 次</span>';
+					return '<a href="/dmonitor/task/info/' + row.id + '" title="' + esc(tip) + '">' + value + ' 次</a>';
 				}
-			},
-			{
-				field: 'active',
-				title: '运行开关',
-				sortable: true,
-				formatter: function(value, row, index) {
-					if(value == 1){
-						return '<div class="material-switch"><input id="active'+row.id+'" type="checkbox" checked onchange="setActive('+row.id+',0)"/><label for="active'+row.id+'" class="label-primary"></label></div>';
-					}else{
-						return '<div class="material-switch"><input id="active'+row.id+'" type="checkbox" onchange="setActive('+row.id+',1)"/><label for="active'+row.id+'" class="label-primary"></label></div>';
-					}
-				}
-			},
-			{
-				field: 'checktimestr',
-				title: '上次检测时间',
-				sortable: true,
-				visible: false
-			},
-			{
-				field: 'switchtimestr',
-				title: '最近切换',
-				sortable: true,
-				formatter: function(value, row, index) {
-					if(row.switchtime == 0) return '<span class="dm-sub">无</span>';
-					return '<span class="dm-value" title="'+esc(value)+'">'+esc(value.substring(5, 16))+'</span>';
-				}
-			},
-			{
-				field: 'addtimestr',
-				title: '添加时间',
-				sortable: true,
-				visible: false
-			},
-			{
-				field: 'remark',
-				title: '备注',
-				sortable: true,
-				visible: false
 			},
 			{
 				field: 'action',
 				title: '操作',
+				align: 'right',
 				formatter: function(value, row, index) {
-					var html = '<span class="dm-actions">';
-					html += '<a href="/dmonitor/task/info/'+row.id+'" class="btn btn-info btn-xs" title="切换日志" data-toggle="tooltip"><i class="fa fa-history"></i></a>';
-					html += '<a href="/dmonitor/task/edit?id='+row.id+'" class="btn btn-primary btn-xs" title="修改" data-toggle="tooltip"><i class="fa fa-pencil"></i></a>';
-					html += '<a href="/dmonitor/task/add?copy='+row.id+'" class="btn btn-default btn-xs" title="复制：以此策略的参数添加新策略" data-toggle="tooltip"><i class="fa fa-copy"></i></a>';
-					html += '<a href="/record/'+row.did+'?subdomain='+encodeURIComponent(row.rr)+'" class="btn btn-default btn-xs" target="_blank" title="查看解析" data-toggle="tooltip"><i class="fa fa-external-link"></i></a>';
-					html += '<a href="javascript:delItem(\''+row.id+'\')" class="btn btn-danger btn-xs" title="删除" data-toggle="tooltip"><i class="fa fa-trash"></i></a>';
-					return html + '</span>';
+					var html = '<div class="dropdown"><a href="javascript:;" class="dm-more" data-toggle="dropdown" aria-label="更多操作"><i class="fa fa-ellipsis-h"></i></a><ul class="dropdown-menu dropdown-menu-right">';
+					html += '<li><a href="/dmonitor/task/info/' + row.id + '"><i class="fa fa-history fa-fw"></i> 切换日志</a></li>';
+					html += '<li><a href="/dmonitor/task/edit?id=' + row.id + '"><i class="fa fa-pencil fa-fw"></i> 修改</a></li>';
+					html += '<li><a href="/dmonitor/task/add?copy=' + row.id + '"><i class="fa fa-copy fa-fw"></i> 复制</a></li>';
+					html += '<li><a href="/record/' + row.did + '?subdomain=' + encodeURIComponent(row.rr) + '" target="_blank"><i class="fa fa-external-link fa-fw"></i> 查看解析</a></li>';
+					html += '<li><a href="javascript:setActive(' + row.id + ',' + (row.active == 1 ? 0 : 1) + ')"><i class="fa fa-power-off fa-fw"></i> ' + (row.active == 1 ? '停止运行' : '开启运行') + '</a></li>';
+					html += '<li role="separator" class="divider"></li>';
+					html += '<li><a href="javascript:delItem(\'' + row.id + '\')" class="text-danger"><i class="fa fa-trash fa-fw"></i> 删除</a></li>';
+					return html + '</ul></div>';
 				}
 			},
 		],
 		onPostBody: function(data) {
-			mergeGroups(data);
-			$('[data-toggle="tooltip"]').tooltip()
+			renderGroups(data);
 		},
 		onPageChange: function(number, size){
 			setStoredPageSize(pageSizeKey, size);
 		},
 	})
 })
-// 分组视图下合并同一主机记录的域名单元格
-function mergeGroups(data){
+// 在每组第一条策略前插入分组标题行
+function renderGroups(data){
 	var $table = $('#listTable');
-	var options = $table.bootstrapTable('getOptions');
-	if(!groupMode || options.sortName || options.cardView || !data.length) return;
-	var $rows = $table.find('tbody > tr');
-	// 勾选列不在可见列中，单元格下标需 +1
-	var hostCol = $table.bootstrapTable('getVisibleColumns').findIndex(function(c){ return c.field == 'rr'; });
+	var $rows = $table.find('tbody > tr[data-index]');
+	if(!data.length || !$rows.length) return;
+	var colspan = $rows.eq(0).children('td').length;
 	var start = 0;
 	for(var i = 1; i <= data.length; i++){
-		if(i < data.length && data[i].did == data[start].did && data[i].rr == data[start].rr) continue;
-		$rows.eq(start).addClass('dm-group-start');
-		if(hostCol >= 0){
-			if(i - start > 1){
-				$table.bootstrapTable('mergeCells', {index: start, field: 'rr', rowspan: i - start});
-			}
-			$rows.eq(start).children('td').eq(hostCol + 1).addClass('dm-host');
-		}
+		if(i < data.length && hostParts(data[i]).key == hostParts(data[start]).key) continue;
+		var group = data.slice(start, i);
+		var host = hostParts(group[0]);
+		var lines = {}, records = {}, multiCheck = false, flapping = false;
+		group.forEach(function(row){
+			lines[hostParts(row).line] = true;
+			if(records[row.recordid]) multiCheck = true;
+			records[row.recordid] = true;
+			if(row.flapping == 1) flapping = true;
+		});
+		var meta = group.length + ' 条策略';
+		var lineCount = Object.keys(lines).length;
+		if(multiCheck) meta += ' · 同记录多检测点';
+		else if(lineCount > 1) meta += ' · ' + lineCount + ' 条线路';
+		var html = '<tr class="dm-group"><td colspan="' + colspan + '"><input type="checkbox" class="dm-group-check" data-start="' + start + '" data-end="' + i + '" title="勾选本组全部策略" style="margin:0 10px 0 0;vertical-align:-2px"><i class="fa fa-globe"></i><b>' + esc(host.title) + '</b><span class="dm-meta">' + meta + '</span>';
+		if(flapping) html += '<span class="dm-pill dm-pill-warn">抖动</span>';
+		html += '</td></tr>';
+		$rows.eq(start).before(html);
 		start = i;
 	}
 }
-function toggleGroup(){
-	groupMode = !groupMode;
-	try { localStorage.setItem(groupModeKey, groupMode ? '1' : '0'); } catch(e) {}
-	updateGroupButton();
-	var $table = $('#listTable');
-	if(groupMode){
-		$table.data('_sortClicks', null);
-		$table.bootstrapTable('refreshOptions', {sortName: '', sortOrder: 'asc', pageNumber: 1});
-	}else{
-		$table.bootstrapTable('refresh');
+$(document).on('change', '#listTable .dm-group-check', function(){
+	var method = this.checked ? 'check' : 'uncheck';
+	for(var i = $(this).data('start'); i < $(this).data('end'); i++){
+		$('#listTable').bootstrapTable(method, i);
 	}
-}
-function updateGroupButton(){
-	$('#btn-group').toggleClass('active', groupMode).attr('title', groupMode ? '当前按主机记录分组，点击取消' : '点击按主机记录分组');
-}
+});
 function loadStats(){
 	$.post('/dmonitor/task/stats', {}, function(res){
 		if(res.code != 0) return;
@@ -371,28 +323,25 @@ function loadStats(){
 		$('#stat-total').text(d.total);
 		$('#stat-running').text(d.running);
 		$('#stat-abnormal').text(d.abnormal);
-		$('#stat-inactive').text(d.inactive);
 		$('#stat-flap').text(d.flap);
 		$('#stat-orphan').text(d.orphan);
-		$('#stat-flap-label').text(d.flap_days + '天内频繁抖动').parent().attr('title', d.flap_days + '天内切换≥' + d.flap_threshold + '次');
+		$('#stat-flap-label').text(d.flap_days + '天内频繁抖动').parent().attr('title', d.flap_days + '天内切换≥' + d.flap_threshold + '次的策略');
 	}, 'json');
-	updateStatActive();
 }
 function updateStatActive(){
-	var status = $('select[name=status]').val(), active = $('select[name=active]').val(), flap = $('input[name=flap]').val();
-	var current = flap == '1' ? 'flap' : (status == '1' ? 'abnormal' : (active == '1' ? 'running' : (active == '0' ? 'inactive' : '')));
-	$('.dm-stat[data-stat]').removeClass('active');
-	if(current) $('.dm-stat[data-stat='+current+']').addClass('active');
+	var state = $('select[name=state]').val();
+	$('.dm-stat[data-state]').removeClass('active');
+	$('.dm-stat[data-state="' + state + '"]').addClass('active');
 }
-function statFilter(stat){
-	$('select[name=status]').val(stat == 'abnormal' ? '1' : '');
-	$('select[name=active]').val(stat == 'running' ? '1' : (stat == 'inactive' ? '0' : ''));
-	$('input[name=flap]').val(stat == 'flap' ? '1' : '');
-	if(stat == 'all'){
-		$('#searchToolbar input[name=kw]').val('');
-	}
-	updateStatActive();
+function statFilter(state){
+	$('select[name=state]').val(state);
+	if(state == '') $('#searchToolbar input[name=kw]').val('');
 	searchSubmit();
+}
+function searchSubmit(){
+	updateStatActive();
+	$('#listTable').bootstrapTable('selectPage', 1);
+	return false;
 }
 function reloadAll(){
 	loadStats();
@@ -447,7 +396,7 @@ function selectedIds(){
 function batchEdit(){
 	var ids = selectedIds();
 	if(ids.length == 0){
-		layer.msg('请选择要操作的策略');
+		layer.msg('请先勾选要修改的策略');
 		return;
 	}
 	$('#form-batchedit')[0].reset();
@@ -491,7 +440,7 @@ function submitBatchEdit(){
 function operation(action){
 	var ids = selectedIds();
 	if(ids.length == 0){
-		layer.msg('请选择要操作的策略');
+		layer.msg('请先勾选要操作的策略');
 		return;
 	}
 	if(action == 'delete'){
