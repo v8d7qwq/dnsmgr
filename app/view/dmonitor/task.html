@@ -48,10 +48,12 @@
 .dm-extra{margin-left:6px;font-size:11px;color:#555;font-weight:400}
 .dm-sep{margin:0 5px;color:#9aa0a6}
 .dm-flap{color:#b45309}
-.dm-more{color:#555;padding:2px 8px;font-size:16px}
-.dm-more:hover{color:#333}
-#dm-list td .dropdown-menu{font-size:13px;min-width:120px}
-@media (min-width:768px){#dm-list .fixed-table-body{overflow:visible}}
+.dm-actions{white-space:nowrap}
+.dm-paused{margin-left:6px;font-size:16px;line-height:18px;color:#d32f2f;font-weight:400}
+.dm-bar{display:block;width:64px;height:4px;border-radius:2px;background:#e5e7eb;overflow:hidden}
+.dm-bar>i{display:block;height:100%;background:#b45309}
+.dm-bar-ok>i{background:#15803d}
+.dm-proto{flex:none;margin-right:6px;padding:0 5px;border-radius:3px;font-size:11px;font-weight:600;line-height:16px;background:#e5e7eb;color:#374151}
 </style>
 <div class="modal" id="modal-batchedit">
 	<div class="modal-dialog" role="document">
@@ -181,7 +183,7 @@ function lineTag(row){
 function stateTags(row){
 	if(recordDeleted(row)) return '<span class="dm-tag dm-tag-red" title="解析记录已删除，策略已停止，请修改策略重新选择解析记录">记录已删除</span>';
 	if(row.status != 1) return '';
-	if(row.type == 1) return '<span class="dm-tag dm-tag-red">已暂停</span>';
+	if(row.type == 1) return '<i class="fa fa-pause-circle dm-paused" title="已暂停解析" aria-label="已暂停解析"></i>';
 	if(row.type == 2) return '<span class="dm-tag dm-tag-orange">已切备用</span>';
 	if(row.type == 3) return '<span class="dm-tag dm-tag-blue">已开启</span>';
 	return '<span class="dm-tag dm-tag-red">检测异常</span>';
@@ -240,7 +242,15 @@ $(document).ready(function(){
 				field: 'linename',
 				title: '线路',
 				formatter: function(value, row, index) {
-					return twoLines(lineTag(row), 'ID ' + row.id);
+					return lineTag(row);
+				}
+			},
+			{
+				field: 'active',
+				title: '运行',
+				formatter: function(value, row, index) {
+					var checked = value == 1;
+					return '<div class="material-switch" title="' + (checked ? '运行中，点击停止' : '已停止，点击开启') + '"><input id="active' + row.id + '" type="checkbox"' + (checked ? ' checked' : '') + ' onchange="setActive(' + row.id + ',' + (checked ? 0 : 1) + ')"/><label for="active' + row.id + '" class="label-primary"></label></div>';
 				}
 			},
 			{
@@ -274,10 +284,11 @@ $(document).ready(function(){
 				title: '检测目标 / 代理',
 				formatter: function(value, row, index) {
 					if(row.type > 2) return twoLines('无需检测', '按同域名暂停策略的状态判断');
+					// 检测协议以灰色标签标注，后接检测目标
 					var target;
-					if(value == 1) target = 'TCP ' + (row.checkurl ? esc(row.checkurl) + ':' : '') + esc(row.tcpport);
-					else if(value == 2) target = 'HTTP(S) ' + esc(urlHost(row.checkurl));
-					else target = 'PING' + (row.checkurl ? ' ' + esc(row.checkurl) : '');
+					if(value == 1) target = '<span class="dm-proto">TCP</span>' + (row.checkurl ? esc(row.checkurl) + ':' : '') + esc(row.tcpport);
+					else if(value == 2) target = '<span class="dm-proto">HTTP(S)</span>' + esc(urlHost(row.checkurl));
+					else target = '<span class="dm-proto">PING</span>' + (row.checkurl ? esc(row.checkurl) : '记录值');
 					var via;
 					if(value == 1) via = row.proxy_name ? '<i class="fa fa-random" style="margin-right:4px"></i>' + esc(row.proxy_name) : '直连';
 					else if(value == 2) via = row.proxy == 1 ? '代理' : '直连';
@@ -295,9 +306,13 @@ $(document).ready(function(){
 					if(row.active != 1) return twoLines('—', '未运行');
 					if(row.type > 2) return twoLines('—', '无需检测');
 					var count = parseInt(value) || 0;
+					var cycle = Math.max(parseInt(row.cycle) || 1, 1);
+					var recovering = row.status == 1;
 					var l1 = '<span class="' + (count > 0 ? 'dm-flap' : '') + '">' + count + ' / ' + row.cycle + '</span>';
-					var tip = row.status == 1 ? '连续检测成功次数，达到阈值后恢复' : '连续检测失败次数，达到阈值后切换';
-					return twoLines(l1, row.status == 1 ? '恢复确认' : '连续失败', tip);
+					// 第二行用矮进度条展示确认进度，不占用额外高度
+					var bar = '<span class="dm-bar' + (recovering ? ' dm-bar-ok' : '') + '"><i style="width:' + Math.min(100, Math.round(count * 100 / cycle)) + '%"></i></span>';
+					var tip = recovering ? '恢复确认：连续检测成功' + count + '次，达到' + row.cycle + '次后恢复' : '连续失败' + count + '次，达到' + row.cycle + '次后切换';
+					return twoLines(l1, bar, tip);
 				}
 			},
 			{
@@ -306,33 +321,20 @@ $(document).ready(function(){
 				formatter: function(value, row, index) {
 					var l1;
 					if(row.flapping == 1) l1 = '<a href="/dmonitor/task/info/' + row.id + '" class="dm-flap" title="切换频繁，点击查看切换日志">' + value + ' 次</a>';
-					else if(value == 0) l1 = '0 次';
+					else if(value == 0) l1 = '<a href="/dmonitor/task/info/' + row.id + '" title="查看切换日志" style="color:#555">0 次</a>';
 					else l1 = '<a href="/dmonitor/task/info/' + row.id + '" title="查看切换日志">' + value + ' 次</a>';
 					var last = row.switchtime > 0 ? '最近 ' + esc(row.switchtimestr.substring(5, 16)) : '从未切换';
 					return twoLines(l1, last, row.switchtime > 0 ? '最近切换：' + row.switchtimestr : '');
 				}
 			},
 			{
-				field: 'active',
-				title: '运行',
-				formatter: function(value, row, index) {
-					var checked = value == 1;
-					return '<div class="material-switch" title="' + (checked ? '运行中，点击停止' : '已停止，点击开启') + '"><input id="active' + row.id + '" type="checkbox"' + (checked ? ' checked' : '') + ' onchange="setActive(' + row.id + ',' + (checked ? 0 : 1) + ')"/><label for="active' + row.id + '" class="label-primary"></label></div>';
-				}
-			},
-			{
 				field: 'action',
 				title: '操作',
-				align: 'right',
 				formatter: function(value, row, index) {
-					var html = '<div class="dropdown"><a href="javascript:;" class="dm-more" data-toggle="dropdown" aria-label="更多操作"><i class="fa fa-ellipsis-h"></i></a><ul class="dropdown-menu dropdown-menu-right">';
-					html += '<li><a href="/dmonitor/task/info/' + row.id + '"><i class="fa fa-history fa-fw"></i> 切换日志</a></li>';
-					html += '<li><a href="/dmonitor/task/edit?id=' + row.id + '"><i class="fa fa-pencil fa-fw"></i> 修改</a></li>';
-					html += '<li><a href="/dmonitor/task/add?copy=' + row.id + '"><i class="fa fa-copy fa-fw"></i> 复制</a></li>';
-					html += '<li><a href="/record/' + row.did + '?subdomain=' + encodeURIComponent(row.rr) + '" target="_blank"><i class="fa fa-external-link fa-fw"></i> 查看解析</a></li>';
-					html += '<li role="separator" class="divider"></li>';
-					html += '<li><a href="javascript:delItem(\'' + row.id + '\')" class="text-danger"><i class="fa fa-trash fa-fw"></i> 删除</a></li>';
-					return html + '</ul></div>';
+					var html = '<span class="dm-actions"><a href="/dmonitor/task/edit?id=' + row.id + '" class="btn btn-info btn-xs">修改</a>';
+					html += ' <a href="/dmonitor/task/add?copy=' + row.id + '" class="btn btn-success btn-xs" title="以此策略的参数添加新策略">复制</a>';
+					html += ' <a href="javascript:delItem(\'' + row.id + '\')" class="btn btn-danger btn-xs">删除</a>';
+					return html + '</span>';
 				}
 			},
 		],
