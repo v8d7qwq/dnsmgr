@@ -3,35 +3,43 @@
 {block name="main"}
 <style>
 .dm-stats{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
-.dm-stat{flex:1 1 150px;display:block;padding:10px 14px;background:#f5f6f8;border:1px solid transparent;border-radius:6px;color:#777;text-decoration:none!important}
-.dm-stat:hover,.dm-stat.active{border-color:#c9d6e3;color:#777}
+.dm-stat{flex:1 1 150px;display:block;padding:10px 14px;background:#f5f6f8;border:1px solid transparent;border-radius:6px;color:#555;text-decoration:none!important}
+.dm-stat:hover,.dm-stat.active{border-color:#c9d6e3;color:#555}
 .dm-stat>span{font-size:12px}
 .dm-stat b{display:block;font-size:22px;font-weight:500;color:#333;line-height:1.35}
-.dm-stat b.dm-danger{color:#c9302c}.dm-stat b.dm-warning{color:#d58512}
+.dm-stat b.dm-danger{color:#c9302c}.dm-stat b.dm-warning{color:#b45309}
 .dm-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .dm-toolbar input[name=kw]{flex:1 1 160px;min-width:140px}
-.dm-check{color:#999;white-space:nowrap}
+.dm-check{color:#444;white-space:nowrap}
 .dm-toolbar select{width:auto}
 #dm-list .fixed-table-toolbar .bs-bars{float:none;width:100%}
 #dm-list .bootstrap-table .fixed-table-container{border:none}
 #dm-list .table{margin-bottom:0}
-#dm-list .table>thead>tr>th{border-bottom:1px solid #eef0f2;color:#999;font-size:12px;font-weight:400}
+#dm-list .table>thead>tr>th{border-bottom:1px solid #eef0f2;color:#555;font-size:12px;font-weight:400}
 #dm-list .table>tbody>tr>td{border-top:1px solid #eef0f2;vertical-align:middle;font-size:13px;padding:8px 10px}
 #dm-list .table>tbody>tr.dm-group>td{background:#f5f6f8;border-top:12px solid #fff;padding:9px 12px;font-size:14px}
 #dm-list .table>tbody>tr.dm-group:first-child>td{border-top:none}
-.dm-group .fa-globe{color:#888;margin-right:6px}
+.dm-group .fa-globe{color:#666;margin-right:6px}
 .dm-group b{font-weight:600;margin-right:8px}
-.dm-meta{color:#999;font-size:12px;margin-right:6px}
-.dm-pill{display:inline-block;min-width:44px;text-align:center;font-size:12px;padding:1px 8px;border-radius:4px;white-space:nowrap}
-.dm-pill-ok{background:#e7f4e4;color:#2f6f22}
-.dm-pill-bad{background:#fbe6e6;color:#a32d2d}
-.dm-pill-warn{background:#fcf1dc;color:#8a5a0b}
-.dm-pill-off{background:#eee;color:#777}
+.dm-meta{color:#555;font-size:12px;margin-right:6px}
+.dm-isp{display:inline-flex;align-items:center;gap:5px;padding:1px 9px 1px 2px;border-radius:11px;font-size:12px;font-weight:600;line-height:18px;white-space:nowrap}
+.dm-isp>i{width:18px;height:18px;border-radius:50%;color:#fff;font-style:normal;font-size:11px;line-height:18px;text-align:center}
+.dm-isp-mobile{background:#e3f1fa;color:#00578f}.dm-isp-mobile>i{background:#0072bc}
+.dm-isp-telecom{background:#e6ecf7;color:#173a7a}.dm-isp-telecom>i{background:#1e50a2}
+.dm-isp-unicom{background:#fde7e9;color:#a8000d}.dm-isp-unicom>i{background:#e60012}
+.dm-isp-other{background:#eceef1;color:#3d4148;padding-left:9px}
+.dm-tag{display:inline-block;margin-left:6px;padding:0 6px;border-radius:3px;font-size:12px;line-height:18px;white-space:nowrap;font-family:inherit}
+.dm-tag-red{background:#d32f2f;color:#fff}
+.dm-tag-orange{background:#c2410c;color:#fff}
+.dm-tag-blue{background:#1d4ed8;color:#fff}
+.dm-tag-amber{background:#fde68a;color:#713f12}
+.dm-tag-gray{background:#e5e7eb;color:#374151}
+.dm-tag-dark{background:#5f6670;color:#fff}
 .dm-mono{font-family:Menlo,Consolas,monospace;white-space:nowrap}
-.dm-muted{color:#999}
+.dm-muted{color:#555}
 .dm-strong{font-weight:600;color:#c9302c}
-.dm-flap{color:#d58512}
-.dm-more{color:#888;padding:2px 8px;font-size:16px}
+.dm-flap{color:#b45309}
+.dm-more{color:#555;padding:2px 8px;font-size:16px}
 .dm-more:hover{color:#333}
 #dm-list td .dropdown-menu{font-size:13px;min-width:120px}
 @media (min-width:768px){#dm-list .fixed-table-body{overflow:visible}}
@@ -123,7 +131,13 @@
 <script src="/static/js/bootstrap-table-page-jump-to-1.21.4.min.js"></script>
 <script src="/static/js/custom.js?v=1006"></script>
 <script>
-const ISP_NAMES = {cm: '移动', yd: '移动', ct: '电信', dx: '电信', cu: '联通', lt: '联通'};
+// 运营商标签：品牌色 + 简化标识（非官方 logo）
+const ISPS = {
+	mobile: {name: '移动', mark: '移'},
+	telecom: {name: '电信', mark: '电'},
+	unicom: {name: '联通', mark: '联'},
+};
+const ISP_CODES = {cm: 'mobile', yd: 'mobile', ct: 'telecom', dx: 'telecom', cu: 'unicom', lt: 'unicom'};
 
 function esc(value){
 	return $('<div>').text(value == null ? '' : String(value)).html();
@@ -131,12 +145,13 @@ function esc(value){
 // 主机记录末段为运营商简写（如 ly.cm）时按前缀分组并以运营商作为线路，其余按主域名分组
 function hostParts(row){
 	var labels = String(row.rr).split('.');
-	var isp = labels.length > 1 ? ISP_NAMES[labels[labels.length - 1].toLowerCase()] : null;
+	var isp = labels.length > 1 ? ISP_CODES[labels[labels.length - 1].toLowerCase()] : null;
 	var prefix = isp ? labels.slice(0, -1).join('.') : '';
 	return {
 		key: row.did + '|' + prefix,
 		title: (prefix ? prefix + '.' : '') + row.domain,
-		line: isp || row.linename || '默认',
+		isp: isp,
+		line: isp ? ISPS[isp].name : (row.linename || '默认'),
 		showRr: !isp,
 	};
 }
@@ -147,9 +162,26 @@ function stateText(row){
 	if(row.type == 3) return '已开启解析';
 	return '检测异常';
 }
-function pillClass(row){
-	if(row.status == 1) return row.type == 3 ? 'dm-pill-warn' : 'dm-pill-bad';
-	return row.active == 1 ? 'dm-pill-ok' : 'dm-pill-off';
+function lineTag(row){
+	var host = hostParts(row);
+	var tip = row.rr + '.' + row.domain + '（ID ' + row.id + '）\nDNS线路：' + (row.linename || '-') + '\n状态：' + stateText(row) + (row.active == 1 ? '' : '，已停止运行');
+	if(host.isp) return '<span class="dm-isp dm-isp-' + host.isp + '" title="' + esc(tip) + '"><i>' + ISPS[host.isp].mark + '</i>' + ISPS[host.isp].name + '</span>';
+	return '<span class="dm-isp dm-isp-other" title="' + esc(tip) + '">' + esc(host.line) + '</span>';
+}
+// 当前状态标签：已暂停/检测异常为红色，已切换备用为橙色
+function stateTags(row){
+	var html = '';
+	if(row.type == 1){
+		if(row.status == 1) html += '<span class="dm-tag dm-tag-red">已暂停</span>';
+	}else if(row.type == 2){
+		if(row.status == 1) html += '<span class="dm-tag dm-tag-orange">已切备用</span>';
+	}else if(row.type == 3){
+		html += row.status == 1 ? '<span class="dm-tag dm-tag-blue">已开启</span>' : '<span class="dm-tag dm-tag-gray">条件开启</span>';
+	}else{
+		html += row.status == 1 ? '<span class="dm-tag dm-tag-red">检测异常</span>' : '<span class="dm-tag dm-tag-gray">仅告警</span>';
+	}
+	if(row.active != 1) html += '<span class="dm-tag dm-tag-dark">已停用</span>';
+	return html;
 }
 
 $(document).ready(function(){
@@ -190,9 +222,7 @@ $(document).ready(function(){
 				field: 'linename',
 				title: '线路',
 				formatter: function(value, row, index) {
-					var host = hostParts(row);
-					var tip = row.rr + '.' + row.domain + '（ID ' + row.id + '）\nDNS线路：' + (row.linename || '-') + '\n状态：' + stateText(row) + (row.active == 1 ? '' : '，已停止运行');
-					return '<span class="dm-pill ' + pillClass(row) + '" title="' + esc(tip) + '">' + esc(host.line) + '</span>';
+					return lineTag(row);
 				}
 			},
 			{
@@ -210,11 +240,8 @@ $(document).ready(function(){
 						if(row.cdn == 1) html += ' <span class="dm-muted" title="切换时开启Cloudflare代理">CF</span>';
 					}else{
 						html += esc(value);
-						if(row.type == 0) html += ' <span class="dm-muted">仅告警</span>';
-						else if(row.type == 1 && row.status == 1) html += ' <span class="dm-muted">已暂停</span>';
-						else if(row.type == 3) html += ' <span class="dm-muted">' + (row.status == 1 ? '已开启' : '条件开启') + '</span>';
 					}
-					return html + '</span>';
+					return html + '</span>' + stateTags(row);
 				}
 			},
 			{
@@ -227,8 +254,7 @@ $(document).ready(function(){
 					else if(value == 2) target = '<span title="' + esc(row.checkurl) + '">HTTP(S)</span>';
 					else target = 'PING' + (row.checkurl ? ' ' + esc(row.checkurl) : '');
 					var via;
-					if(row.active != 1) via = '停用';
-					else if(value == 1) via = row.proxy_name ? esc(row.proxy_name) : '直连';
+					if(value == 1) via = row.proxy_name ? esc(row.proxy_name) : '直连';
 					else if(value == 2) via = row.proxy == 1 ? '代理' : '直连';
 					else via = '直连';
 					var tip = '每' + row.frequency + '秒检测' + (value > 0 ? '，超时' + row.timeout + '秒' : '') + '\n上次检测：' + row.checktimestr;
@@ -304,7 +330,7 @@ function renderGroups(data){
 		if(multiCheck) meta += ' · 同记录多检测点';
 		else if(lineCount > 1) meta += ' · ' + lineCount + ' 条线路';
 		var html = '<tr class="dm-group"><td colspan="' + colspan + '"><input type="checkbox" class="dm-group-check" data-start="' + start + '" data-end="' + i + '" title="勾选本组全部策略" style="margin:0 10px 0 0;vertical-align:-2px"><i class="fa fa-globe"></i><b>' + esc(host.title) + '</b><span class="dm-meta">' + meta + '</span>';
-		if(flapping) html += '<span class="dm-pill dm-pill-warn">抖动</span>';
+		if(flapping) html += '<span class="dm-tag dm-tag-amber" style="margin-left:0">抖动</span>';
 		html += '</td></tr>';
 		$rows.eq(start).before(html);
 		start = i;
