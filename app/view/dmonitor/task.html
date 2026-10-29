@@ -2,14 +2,79 @@
 {block name="title"}容灾切换策略{/block}
 {block name="main"}
 <style>
-tbody tr>td:nth-child(3){overflow: hidden;text-overflow: ellipsis;white-space: nowrap;max-width:180px;}
-tbody tr>td:nth-child(4){overflow: hidden;text-overflow: ellipsis;white-space: nowrap;max-width:200px;}
+tbody tr>td.dm-host{vertical-align:middle;background:#fafbfc}
+tbody tr.dm-group-start>td{border-top:2px solid #dfe3e8}
+.dm-stats{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.dm-stat{flex:1 1 130px;display:block;padding:10px 14px;border:1px solid #e5e8eb;border-radius:4px;color:#6c757d;text-decoration:none!important}
+.dm-stat:hover,.dm-stat.active{border-color:#3c8dbc;background:#f5f9fc;color:#6c757d}
+.dm-stat b{display:block;font-size:22px;font-weight:500;color:#333;line-height:1.3}
+.dm-stat .text-danger{color:#d9534f}.dm-stat .text-warning{color:#e08e0b}
+.dm-value{white-space:nowrap}
+.dm-value .dm-off{color:#aaa}
+.dm-value .dm-on{font-weight:600}
+.dm-sub{color:#999;font-size:12px}
+.dm-progress{display:inline-block;width:46px;height:6px;background:#eee;border-radius:3px;vertical-align:middle;margin-right:4px;overflow:hidden}
+.dm-progress>i{display:block;height:100%;background:#f0ad4e}
+.dm-actions{white-space:nowrap}
+.dm-actions>.btn{margin-right:4px}
 </style>
+<div class="modal" id="modal-batchedit">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+				<h4 class="modal-title">批量修改参数</h4>
+			</div>
+			<div class="modal-body">
+				<form id="form-batchedit" onsubmit="return false;" class="form-horizontal">
+					<p class="help-block" style="margin-top:0">已选择 <b id="batchedit-count">0</b> 个策略。留空的参数不修改；不适用的策略会自动跳过（如 TCP 端口和代理只修改 TCP 检测的策略）。</p>
+					<div class="form-group">
+						<label class="col-sm-4 control-label">检测间隔</label>
+						<div class="col-sm-6"><div class="input-group"><input type="number" min="1" class="form-control" name="frequency" placeholder="不修改"><span class="input-group-addon">秒</span></div></div>
+					</div>
+					<div class="form-group">
+						<label class="col-sm-4 control-label">确认次数</label>
+						<div class="col-sm-6"><input type="number" min="1" class="form-control" name="cycle" placeholder="不修改（条件开启策略不适用）"></div>
+					</div>
+					<div class="form-group">
+						<label class="col-sm-4 control-label">最大超时时间</label>
+						<div class="col-sm-6"><div class="input-group"><input type="number" min="1" class="form-control" name="timeout" placeholder="不修改"><span class="input-group-addon">秒</span></div></div>
+					</div>
+					<div class="form-group">
+						<label class="col-sm-4 control-label">TCP检测端口</label>
+						<div class="col-sm-6"><input type="number" min="1" max="65535" class="form-control" name="tcpport" placeholder="不修改"></div>
+					</div>
+					<div class="form-group">
+						<label class="col-sm-4 control-label">TCP代理</label>
+						<div class="col-sm-6"><select class="form-control" name="tcp_proxy_id">
+							<option value="">不修改</option>
+							<option value="0">无代理</option>
+							{foreach $proxies as $p}<option value="{$p.id}">{$p.name} ({$p.proxy_server}:{$p.proxy_port})</option>{/foreach}
+						</select></div>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+				<button type="button" class="btn btn-primary" onclick="submitBatchEdit()">确定</button>
+			</div>
+		</div>
+	</div>
+</div>
 <div class="row">
 	<div class="col-xs-12 center-block" style="float: none;">
 	<div class="panel panel-default panel-intro">
 	<div class="panel-body">
-	
+
+<div class="dm-stats">
+	<a href="javascript:statFilter('all')" class="dm-stat" data-stat="all"><span>全部策略</span><b id="stat-total">-</b></a>
+	<a href="javascript:statFilter('running')" class="dm-stat" data-stat="running"><span>运行中</span><b id="stat-running">-</b></a>
+	<a href="javascript:statFilter('abnormal')" class="dm-stat" data-stat="abnormal"><span>异常（已切换/暂停）</span><b id="stat-abnormal" class="text-danger">-</b></a>
+	<a href="javascript:statFilter('inactive')" class="dm-stat" data-stat="inactive"><span>已停止运行</span><b id="stat-inactive">-</b></a>
+	<a href="javascript:statFilter('flap')" class="dm-stat" data-stat="flap"><span id="stat-flap-label">频繁抖动</span><b id="stat-flap" class="text-warning">-</b></a>
+	<a href="javascript:cleanOrphan()" class="dm-stat" title="已删除策略遗留的切换记录，点击清理"><span>孤儿切换记录 <i class="fa fa-trash"></i></span><b id="stat-orphan">-</b></a>
+</div>
+
 <form onsubmit="return searchSubmit()" method="GET" class="form-inline" id="searchToolbar">
   <div class="form-group">
 	<label>搜索</label>
@@ -25,12 +90,17 @@ tbody tr>td:nth-child(4){overflow: hidden;text-overflow: ellipsis;white-space: n
 		<select name="status" class="form-control"><option value="">健康状况</option><option value="0">正常</option><option value="1">异常</option></select>
 	</div>
   </div>
+  <div class="form-group">
+	<select name="active" class="form-control"><option value="">运行开关</option><option value="1">运行中</option><option value="0">已停止</option></select>
+  </div>
+  <input type="hidden" name="flap" value="">
   <button type="submit" class="btn btn-primary"><i class="fa fa-search"></i> 搜索</button>
   <a href="javascript:searchClear()" class="btn btn-default" title="刷新域名账户列表"><i class="fa fa-refresh"></i> 刷新</a>
   <a href="/dmonitor/task/add" class="btn btn-success"><i class="fa fa-plus"></i> 添加</a>
+  <a href="javascript:toggleGroup()" class="btn btn-default" id="btn-group"><i class="fa fa-object-group"></i> 按主机分组</a>
   <div class="btn-group" role="group">
 	<button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">批量操作 <span class="caret"></span></button>
-	<ul class="dropdown-menu"><li><a href="javascript:operation('open')">开启运行</a></li><li><a href="javascript:operation('close')">停止运行</a></li><li><a href="javascript:operation('retry')">立即重试</a></li><li><a href="javascript:operation('delete')">删除</a></li></ul>
+	<ul class="dropdown-menu"><li><a href="javascript:batchEdit()">修改参数</a></li><li><a href="javascript:operation('open')">开启运行</a></li><li><a href="javascript:operation('close')">停止运行</a></li><li><a href="javascript:operation('retry')">立即重试</a></li><li><a href="javascript:operation('delete')">删除</a></li></ul>
   </div>
 </form>
 
@@ -47,8 +117,30 @@ tbody tr>td:nth-child(4){overflow: hidden;text-overflow: ellipsis;white-space: n
 <script src="/static/js/bootstrap-table-page-jump-to-1.21.4.min.js"></script>
 <script src="/static/js/custom.js?v=1006"></script>
 <script>
+const groupModeKey = 'dmtask_group';
+var groupMode = (function(){
+	try { return localStorage.getItem(groupModeKey) !== '0'; } catch(e) { return true; }
+})();
+
+function esc(value){
+	return $('<div>').text(value == null ? '' : String(value)).html();
+}
+// 当前状态的含义随切换设置不同
+function stateLabel(row){
+	if(row.status == 0){
+		if(row.type == 3) return '<span class="label label-default">未开启</span>';
+		return '<span class="label label-success">正常</span>';
+	}
+	if(row.type == 1) return '<span class="label label-danger">已暂停解析</span>';
+	if(row.type == 2) return '<span class="label label-danger">已切换备用</span>';
+	if(row.type == 3) return '<span class="label label-warning">已开启解析</span>';
+	return '<span class="label label-danger">异常</span>';
+}
+
 $(document).ready(function(){
 	updateToolbar();
+	updateGroupButton();
+	loadStats();
 	const pageSizeKey = 'dmtask_pagesize';
 	const pageNumber = typeof window.$_GET['pageNumber'] != 'undefined' ? parseInt(window.$_GET['pageNumber']) : 1;
 	const pageSize = getStoredPageSize(pageSizeKey);
@@ -63,6 +155,11 @@ $(document).ready(function(){
 		sortReset: false,
 		sortName: urlSort,
 		sortOrder: urlOrder,
+		queryParams: function(params) {
+			params = $.fn.bootstrapTable.custom.queryParams(params);
+			params.group = groupMode ? 1 : 0;
+			return params;
+		},
 		columns: [
 			{
 				field: '',
@@ -78,7 +175,14 @@ $(document).ready(function(){
 				title: '域名',
 				sortable: true,
 				formatter: function(value, row, index) {
-					return '<span title="'+row.remark+'" data-toggle="tooltip" data-placement="right">' + value + '.' + row.domain + '</span>';
+					return '<span title="'+esc(row.remark)+'" data-toggle="tooltip" data-placement="right">' + esc(value) + '.' + esc(row.domain) + '</span>';
+				}
+			},
+			{
+				field: 'linename',
+				title: '线路',
+				formatter: function(value, row, index) {
+					return value ? esc(value) : '<span class="dm-sub">-</span>';
 				}
 			},
 			{
@@ -86,49 +190,62 @@ $(document).ready(function(){
 				title: '解析记录',
 				sortable: true,
 				formatter: function(value, row, index) {
-					return value;
+					if(row.type == 2){
+						var onBackup = row.status == 1;
+						var extra = [];
+						if(row.cname_flatten == 1) extra.push('CNAME展平');
+						if(row.cdn == 1) extra.push('CF代理');
+						return '<span class="dm-value" title="当前生效：'+(onBackup?'备用':'主')+'记录" data-toggle="tooltip"><span class="'+(onBackup?'dm-off':'dm-on')+'">'+esc(value)+'</span> <i class="fa fa-long-arrow-right dm-sub"></i> <span class="'+(onBackup?'dm-on text-danger':'dm-off')+'">'+esc(row.backup_value)+'</span></span>' + (extra.length ? '<div class="dm-sub">'+extra.join('，')+'</div>' : '');
+					}
+					return '<span class="dm-value">'+esc(value)+'</span>';
 				}
 			},
 			{
 				field: 'type',
 				title: '切换设置',
+				sortable: true,
 				formatter: function(value, row, index) {
 					if(value == 1) {
 						return '暂停解析';
 					} else if(value == 2) {
-						var extra = '';
-						if(row.cname_flatten == 1) extra += '；CNAME展平为A记录';
-						if(row.cdn == 1) extra += '；开启CF代理';
-						return '<span title="" data-toggle="tooltip" data-placement="bottom" data-original-title="备用：'+row.backup_value+extra+'" class="tips">切换备用</span>';
+						return '切换备用';
 					} else if(value == 3) {
-						return '<span title="" data-toggle="tooltip" data-placement="bottom" data-original-title="同域名正常数量<='+row.cycle+'" class="tips">条件开启</span>';
+						return '<span title="" data-toggle="tooltip" data-placement="bottom" data-original-title="同域名正常数量<='+esc(row.cycle)+'" class="tips">条件开启</span>';
 					} else {
-						return '无操作';
+						return '仅告警';
 					}
 				}
 			},
 			{
 				field: 'checktype',
-				title: '检测协议',
+				title: '检测',
+				sortable: true,
 				formatter: function(value, row, index) {
-					if(row.type <= 2){
-						if(value == 1) {
-							return '<span title="" data-toggle="tooltip" data-placement="bottom" data-original-title="'+row.tcpport+'端口" class="tips">TCP</span>';
-						} else if(value == 2) {
-							return '<span title="" data-toggle="tooltip" data-placement="bottom" data-original-title="'+row.checkurl+'" class="tips">HTTP(S)</span>';
-						} else {
-							return 'PING';
-						}
+					if(row.type > 2) return '无';
+					var html;
+					if(value == 1) {
+						html = 'TCP ' + (row.checkurl ? esc(row.checkurl)+':' : '') + esc(row.tcpport);
+					} else if(value == 2) {
+						html = '<span title="" data-toggle="tooltip" data-placement="bottom" data-original-title="'+esc(row.checkurl)+'" class="tips">HTTP(S)</span>' + (row.proxy == 1 ? ' · 代理' : '');
 					} else {
-						return '无';
+						html = 'PING' + (row.checkurl ? ' '+esc(row.checkurl) : '');
 					}
+					var sub = row.frequency + '秒';
+					if(value > 0) sub += ' · 超时' + row.timeout + '秒';
+					if(value == 1) sub += ' · ' + (row.proxy_name ? '<i class="fa fa-random"></i> '+esc(row.proxy_name) : '直连');
+					return html + '<div class="dm-sub">' + sub + '</div>';
 				}
 			},
 			{
-				field: 'frequency',
-				title: '检测间隔',
+				field: 'errcount',
+				title: '确认进度',
 				formatter: function(value, row, index) {
-					return value + '秒';
+					if(row.type > 2) return '<span class="dm-sub">-</span>';
+					var cycle = Math.max(parseInt(row.cycle) || 1, 1);
+					var count = parseInt(value) || 0;
+					var percent = Math.min(100, Math.round(count * 100 / cycle));
+					var text = (row.status == 1 ? '恢复 ' : '失败 ') + count + '/' + cycle;
+					return '<span title="'+(row.status == 1 ? '连续成功次数，达到后恢复' : '连续失败次数，达到后切换')+'" data-toggle="tooltip"><span class="dm-progress"><i style="width:'+percent+'%;'+(row.status == 1 ? 'background:#5cb85c' : '')+'"></i></span><span class="'+(count > 0 ? '' : 'dm-sub')+'">'+text+'</span></span>';
 				}
 			},
 			{
@@ -136,11 +253,17 @@ $(document).ready(function(){
 				title: '健康状况',
 				sortable: true,
 				formatter: function(value, row, index) {
-					if(value == 0) {
-						return '<span class="label label-success">正常</span>';
-					} else {
-						return '<span class="label label-danger">异常</span>';
-					}
+					return stateLabel(row);
+				}
+			},
+			{
+				field: 'switch_count',
+				title: '近7天切换',
+				formatter: function(value, row, index) {
+					if(value == 0) return '<span class="dm-sub">0</span>';
+					var html = '<a href="/dmonitor/task/info/'+row.id+'">' + value + ' 次</a>';
+					if(row.flapping == 1) html = '<span class="label label-warning" title="切换频繁，建议检查网络或调整确认次数" data-toggle="tooltip">抖动</span> ' + html;
+					return html;
 				}
 			},
 			{
@@ -158,7 +281,17 @@ $(document).ready(function(){
 			{
 				field: 'checktimestr',
 				title: '上次检测时间',
-				sortable: true
+				sortable: true,
+				visible: false
+			},
+			{
+				field: 'switchtimestr',
+				title: '最近切换',
+				sortable: true,
+				formatter: function(value, row, index) {
+					if(row.switchtime == 0) return '<span class="dm-sub">无</span>';
+					return '<span class="dm-value" title="'+esc(value)+'">'+esc(value.substring(5, 16))+'</span>';
+				}
 			},
 			{
 				field: 'addtimestr',
@@ -176,15 +309,18 @@ $(document).ready(function(){
 				field: 'action',
 				title: '操作',
 				formatter: function(value, row, index) {
-					var html = '<a href="/dmonitor/task/info/'+row.id+'" class="btn btn-info btn-xs">切换日志</a>&nbsp;&nbsp;';
-					html += '<a href="/dmonitor/task/edit?id='+row.id+'" class="btn btn-primary btn-xs">修改</a>&nbsp;&nbsp;';
-					html += '<a href="/record/'+row.did+'?subdomain='+row.rr+'" class="btn btn-default btn-xs" target="_blank">解析</a>&nbsp;&nbsp;';
-					html += '<a href="javascript:delItem(\''+row.id+'\')" class="btn btn-danger btn-xs">删除</a>&nbsp;&nbsp;';
-					return html;
+					var html = '<span class="dm-actions">';
+					html += '<a href="/dmonitor/task/info/'+row.id+'" class="btn btn-info btn-xs" title="切换日志" data-toggle="tooltip"><i class="fa fa-history"></i></a>';
+					html += '<a href="/dmonitor/task/edit?id='+row.id+'" class="btn btn-primary btn-xs" title="修改" data-toggle="tooltip"><i class="fa fa-pencil"></i></a>';
+					html += '<a href="/dmonitor/task/add?copy='+row.id+'" class="btn btn-default btn-xs" title="复制：以此策略的参数添加新策略" data-toggle="tooltip"><i class="fa fa-copy"></i></a>';
+					html += '<a href="/record/'+row.did+'?subdomain='+encodeURIComponent(row.rr)+'" class="btn btn-default btn-xs" target="_blank" title="查看解析" data-toggle="tooltip"><i class="fa fa-external-link"></i></a>';
+					html += '<a href="javascript:delItem(\''+row.id+'\')" class="btn btn-danger btn-xs" title="删除" data-toggle="tooltip"><i class="fa fa-trash"></i></a>';
+					return html + '</span>';
 				}
 			},
 		],
-		onLoadSuccess: function(data) {
+		onPostBody: function(data) {
+			mergeGroups(data);
 			$('[data-toggle="tooltip"]').tooltip()
 		},
 		onPageChange: function(number, size){
@@ -192,11 +328,95 @@ $(document).ready(function(){
 		},
 	})
 })
+// 分组视图下合并同一主机记录的域名单元格
+function mergeGroups(data){
+	var $table = $('#listTable');
+	var options = $table.bootstrapTable('getOptions');
+	if(!groupMode || options.sortName || options.cardView || !data.length) return;
+	var $rows = $table.find('tbody > tr');
+	// 勾选列不在可见列中，单元格下标需 +1
+	var hostCol = $table.bootstrapTable('getVisibleColumns').findIndex(function(c){ return c.field == 'rr'; });
+	var start = 0;
+	for(var i = 1; i <= data.length; i++){
+		if(i < data.length && data[i].did == data[start].did && data[i].rr == data[start].rr) continue;
+		$rows.eq(start).addClass('dm-group-start');
+		if(hostCol >= 0){
+			if(i - start > 1){
+				$table.bootstrapTable('mergeCells', {index: start, field: 'rr', rowspan: i - start});
+			}
+			$rows.eq(start).children('td').eq(hostCol + 1).addClass('dm-host');
+		}
+		start = i;
+	}
+}
+function toggleGroup(){
+	groupMode = !groupMode;
+	try { localStorage.setItem(groupModeKey, groupMode ? '1' : '0'); } catch(e) {}
+	updateGroupButton();
+	var $table = $('#listTable');
+	if(groupMode){
+		$table.data('_sortClicks', null);
+		$table.bootstrapTable('refreshOptions', {sortName: '', sortOrder: 'asc', pageNumber: 1});
+	}else{
+		$table.bootstrapTable('refresh');
+	}
+}
+function updateGroupButton(){
+	$('#btn-group').toggleClass('active', groupMode).attr('title', groupMode ? '当前按主机记录分组，点击取消' : '点击按主机记录分组');
+}
+function loadStats(){
+	$.post('/dmonitor/task/stats', {}, function(res){
+		if(res.code != 0) return;
+		var d = res.data;
+		$('#stat-total').text(d.total);
+		$('#stat-running').text(d.running);
+		$('#stat-abnormal').text(d.abnormal);
+		$('#stat-inactive').text(d.inactive);
+		$('#stat-flap').text(d.flap);
+		$('#stat-orphan').text(d.orphan);
+		$('#stat-flap-label').text(d.flap_days + '天内频繁抖动').parent().attr('title', d.flap_days + '天内切换≥' + d.flap_threshold + '次');
+	}, 'json');
+	updateStatActive();
+}
+function updateStatActive(){
+	var status = $('select[name=status]').val(), active = $('select[name=active]').val(), flap = $('input[name=flap]').val();
+	var current = flap == '1' ? 'flap' : (status == '1' ? 'abnormal' : (active == '1' ? 'running' : (active == '0' ? 'inactive' : '')));
+	$('.dm-stat[data-stat]').removeClass('active');
+	if(current) $('.dm-stat[data-stat='+current+']').addClass('active');
+}
+function statFilter(stat){
+	$('select[name=status]').val(stat == 'abnormal' ? '1' : '');
+	$('select[name=active]').val(stat == 'running' ? '1' : (stat == 'inactive' ? '0' : ''));
+	$('input[name=flap]').val(stat == 'flap' ? '1' : '');
+	if(stat == 'all'){
+		$('#searchToolbar input[name=kw]').val('');
+	}
+	updateStatActive();
+	searchSubmit();
+}
+function reloadAll(){
+	loadStats();
+	searchRefresh();
+}
+function cleanOrphan(){
+	layer.confirm('确定清理已删除策略遗留的切换记录吗？', {
+		btn: ['确定','取消']
+	}, function(){
+		$.post('/dmonitor/clean', {orphan: 1}, function(data){
+			if(data.code == 0) {
+				layer.msg(data.msg, {icon: 1});
+				loadStats();
+			} else {
+				layer.msg(data.msg, {icon: 2});
+			}
+		}, 'json');
+	});
+}
 function setActive(id, active){
 	$.post('/dmonitor/task/setactive', {id: id, active: active}, function(data){
 		if(data.code == 0) {
 			layer.msg('修改成功', {icon: 1, time:800});
-			$('#listTable').bootstrapTable('refresh');
+			reloadAll();
 		} else {
 			layer.msg(data.msg, {icon: 2});
 		}
@@ -209,22 +429,70 @@ function delItem(id){
 		$.post('/dmonitor/task/del', {id: id}, function(data){
 			if(data.code == 0) {
 				layer.msg('删除成功', {icon: 1, time:800});
-				$('#listTable').bootstrapTable('refresh');
+				reloadAll();
 			} else {
 				layer.msg(data.msg, {icon: 2});
 			}
 		}, 'json');
 	});
 }
-function operation(action){
+function selectedIds(){
 	var rows = $("#listTable").bootstrapTable('getSelections');
-	if(rows.length == 0){
-		layer.msg('请选择要操作的策略');
-		return;
-	}
 	var ids = [];
 	for(var i in rows){
 		ids.push(rows[i].id);
+	}
+	return ids;
+}
+function batchEdit(){
+	var ids = selectedIds();
+	if(ids.length == 0){
+		layer.msg('请选择要操作的策略');
+		return;
+	}
+	$('#form-batchedit')[0].reset();
+	$('#batchedit-count').text(ids.length);
+	$('#modal-batchedit').modal('show');
+}
+function submitBatchEdit(){
+	var ids = selectedIds();
+	var data = {ids: ids};
+	var hasChange = false;
+	$('#form-batchedit').find(':input[name]').each(function(){
+		data[$(this).attr('name')] = $(this).val();
+		if($(this).val() !== '') hasChange = true;
+	});
+	if(!hasChange){
+		layer.msg('请至少填写一项要修改的参数');
+		return;
+	}
+	var ii = layer.load(2);
+	$.ajax({
+		type : 'POST',
+		url : '/dmonitor/task/batchedit',
+		data : data,
+		dataType : 'json',
+		success : function(res) {
+			layer.close(ii);
+			if(res.code == 0){
+				$('#modal-batchedit').modal('hide');
+				layer.alert(res.msg, {icon: 1});
+				reloadAll();
+			}else{
+				layer.alert(res.msg, {icon: 2});
+			}
+		},
+		error: function(){
+			layer.close(ii);
+			layer.msg('服务器错误');
+		}
+	});
+}
+function operation(action){
+	var ids = selectedIds();
+	if(ids.length == 0){
+		layer.msg('请选择要操作的策略');
+		return;
 	}
 	if(action == 'delete'){
 		if(!confirm('确定要删除所选策略吗？')) return;
@@ -241,7 +509,7 @@ function operation(action){
 			if(data.code == 0){
 				layer.closeAll();
 				layer.alert(data.msg, {icon: 1});
-				searchRefresh();
+				reloadAll();
 			}else{
 				layer.alert(data.msg, {icon: 2});
 			}

@@ -122,6 +122,7 @@ Route::group(function () {
 
     Route::get('/dmonitor/overview', 'dmonitor/overview');
     Route::post('/dmonitor/task/data', 'dmonitor/task_data');
+    Route::post('/dmonitor/task/stats', 'dmonitor/task_stats');
     Route::post('/dmonitor/task/log/data/:id', 'dmonitor/tasklog_data');
     Route::get('/dmonitor/task/info/:id', 'dmonitor/taskinfo');
     Route::post('/dmonitor/task/:action', 'dmonitor/task_op');

@@ -24,16 +24,17 @@
         <label class="col-sm-3 col-xs-12 control-label no-padding-right" is-required>域名选择</label>
         <div class="col-sm-6">
             <div class="input-group">
-                <input type="text" name="rr" v-model="set.rr" placeholder="主机记录" class="form-control" required>
+                <input type="text" name="rr" v-model="set.rr" :placeholder="action=='edit'?'主机记录':'主机记录，多个用逗号或空格分隔'" class="form-control" required>
                 <span class="input-group-addon">.</span>
                 <select name="did" v-model="set.did" class="form-control" required>
                     <option value="">--主域名--</option>
                     <option v-for="option in domainList" :value="option.id">{{option.name}}</option>
                 </select>
             </div>
+            <p class="help-block" v-if="action!='edit'">可同时填写多个主机记录（如 ly.cm ly.ct ly.cu），获取后勾选要添加的解析记录，下方参数会应用到所有勾选的记录。</p>
         </div>
     </div>
-    <div class="form-group">
+    <div class="form-group" v-if="action=='edit'">
         <label class="col-sm-3 control-label no-padding-right" is-required>解析记录</label>
         <div class="col-sm-6"><div class="input-group">
             <select name="recordid" v-model="set.recordid" id="recordid" class="form-control" required>
@@ -43,6 +44,35 @@
                 <button type="button" @click="getRecordList" class="btn btn-info">点击获取</button>
             </div>
         </div></div>
+    </div>
+    <div class="form-group" v-else>
+        <label class="col-sm-3 control-label no-padding-right" is-required>解析记录</label>
+        <div class="col-sm-8">
+            <button type="button" @click="getRecordList" class="btn btn-info">点击获取</button>
+            <span class="help-block" style="display:inline-block;margin-left:8px" v-if="recordRows.length">已勾选 {{checkedRows.length}} / {{recordRows.length}} 条</span>
+            <div class="table-responsive" v-if="recordRows.length" style="margin-top:8px">
+            <table class="table table-bordered table-condensed" style="margin-bottom:0">
+                <thead><tr>
+                    <th style="width:32px"><input type="checkbox" :checked="checkedRows.length==recordRows.length" @change="toggleAllRows($event.target.checked)"></th>
+                    <th>主机记录</th><th>类型</th><th>记录值</th><th>线路</th>
+                    <th v-show="set.type==2">备用解析记录</th>
+                    <th v-show="set.type<=2&&set.checktype<2">指定检测IP</th>
+                </tr></thead>
+                <tbody>
+                    <tr v-for="item in recordRows" :key="item.key">
+                        <td><input type="checkbox" v-model="item.checked"></td>
+                        <td>{{item.rr}}</td>
+                        <td>{{item.Type}}</td>
+                        <td>{{item.value}}</td>
+                        <td>{{item.LineName}}</td>
+                        <td v-show="set.type==2"><input type="text" v-model="item.backup_value" class="form-control input-sm" :placeholder="set.backup_value ? '同下方：'+set.backup_value : '必填'"></td>
+                        <td v-show="set.type<=2&&set.checktype<2"><input type="text" v-model="item.checkurl" class="form-control input-sm" :placeholder="set.checkurl ? '同下方：'+set.checkurl : '默认为记录值IP'"></td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+            <p class="help-block" v-if="recordRows.length && (set.type==2 || (set.type<=2&&set.checktype<2))">每行留空则使用下方填写的备用解析记录/指定检测IP。</p>
+        </div>
     </div>
     <div class="form-group">
         <label class="col-sm-3 control-label no-padding-right" is-required>切换设置</label>
@@ -55,7 +85,7 @@
     <div class="form-group" v-show="set.type==2">
         <label class="col-sm-3 control-label no-padding-right" is-required>备用解析记录</label>
         <div class="col-sm-6">
-            <input type="text" name="backup_value" v-model="set.backup_value" placeholder="支持填写IP或CNAME地址" class="form-control" required>
+            <input type="text" name="backup_value" v-model="set.backup_value" placeholder="支持填写IP或CNAME地址" class="form-control" :required="action=='edit'">
         </div>
     </div>
     <div class="form-group" v-show="set.type==2">
@@ -202,6 +232,7 @@ new Vue({
         domainList: domainList,
         proxyList: proxyList,
         recordList: [],
+        recordRows: [],
         typeList: [
             {value:0, label:'无操作'},
             {value:1, label:'暂停解析'},
@@ -213,6 +244,11 @@ new Vue({
             {value:1, label:'TCP'},
             {value:2, label:'HTTP(S)'},
         ]
+    },
+    computed: {
+        checkedRows: function(){
+            return this.recordRows.filter(item => item.checked);
+        }
     },
     watch: {
         'set.recordid': function(val){
@@ -238,6 +274,14 @@ new Vue({
             this.recordList = [{RecordId:this.set.recordid, Value:this.set.main_value, Line:recordinfo.Line, LineName:recordinfo.LineName, TTL:recordinfo.TTL}];
             this.set.cdn = this.set.cdn == 1 || this.set.cdn === true || this.set.cdn === '1';
             this.set.cname_flatten = this.set.cname_flatten == 1 || this.set.cname_flatten === true || this.set.cname_flatten === '1';
+        } else if(info){
+            // 复制策略：沿用参数后自动获取解析记录
+            Object.keys(info).forEach((key) => {
+                this.$set(this.set, key, info[key])
+            })
+            this.set.cdn = this.set.cdn == 1 || this.set.cdn === true || this.set.cdn === '1';
+            this.set.cname_flatten = this.set.cname_flatten == 1 || this.set.cname_flatten === true || this.set.cname_flatten === '1';
+            if(this.set.did && this.set.rr) this.$nextTick(() => this.getRecordList());
         }
         $("#taskform").bootstrapValidator({
             live: 'submitted',
@@ -245,6 +289,9 @@ new Vue({
         $('[data-toggle="tooltip"]').tooltip();
     },
     methods: {
+        toggleAllRows(checked){
+            this.recordRows.forEach(item => { item.checked = checked; });
+        },
         getRecordList(){
             var that = this;
             if(this.set.did == ''){
@@ -252,6 +299,10 @@ new Vue({
             }
             if(this.set.rr == ''){
                 layer.msg('主机记录不能为空', {time: 800});return;
+            }
+            if(this.action != 'edit'){
+                this.getRecordRows();
+                return;
             }
             var ii = layer.load(2, {shade:[0.1,'#fff']});
             $.ajax({
@@ -282,11 +333,107 @@ new Vue({
                 }
             });
         },
+        // 添加模式：按多个主机记录获取解析记录，供勾选批量添加
+        getRecordRows(){
+            var that = this;
+            var rrs = this.set.rr.split(/[\s,，;；]+/).filter((rr, i, arr) => rr != '' && arr.indexOf(rr) == i);
+            var did = this.set.did;
+            var ii = layer.load(2, {shade:[0.1,'#fff']});
+            var requests = rrs.map(rr => Promise.resolve($.ajax({
+                type : 'POST',
+                url : '/record/list',
+                data : {id:did, rr:rr},
+                dataType : 'json'
+            })).then(data => ({rr: rr, data: data}), () => ({rr: rr, data: {code: -1, msg: '服务器错误'}})));
+            Promise.all(requests).then(results => {
+                layer.close(ii);
+                var rows = [], errors = [];
+                results.forEach(result => {
+                    if(result.data.code != 0){
+                        errors.push(result.rr + '：' + result.data.msg);
+                        return;
+                    }
+                    result.data.data.forEach(record => {
+                        var value = typeof record.Value == 'object' ? record.Value[0] : record.Value;
+                        rows.push({
+                            key: result.rr + '|' + record.RecordId,
+                            rr: result.rr,
+                            RecordId: record.RecordId,
+                            Type: record.Type,
+                            value: value,
+                            Line: record.Line,
+                            LineName: record.LineName,
+                            TTL: record.TTL,
+                            checked: ['A', 'AAAA', 'CNAME'].indexOf(record.Type) >= 0,
+                            backup_value: '',
+                            checkurl: '',
+                        });
+                    });
+                });
+                that.recordRows = rows;
+                if(errors.length){
+                    layer.alert(errors.join('<br/>'), {icon:2});
+                }else{
+                    layer.msg('成功获取到'+rows.length+'条解析记录', {icon:1, time:800});
+                }
+            });
+        },
+        submitBatch(){
+            var that = this;
+            var rows = this.checkedRows;
+            if(rows.length == 0){
+                layer.msg('请点击获取并勾选解析记录', {time: 1500});return;
+            }
+            for(var i = 0; i < rows.length; i++){
+                var row = rows[i];
+                if(this.set.type == 2 && !row.backup_value && !this.set.backup_value){
+                    layer.alert(row.rr + '（' + row.value + '）未填写备用解析记录', {icon:2});return;
+                }
+                if(this.set.type <= 2 && this.set.checktype < 2 && row.checkurl && !/^[0-9a-fA-F:.]+$/.test(row.checkurl)){
+                    layer.alert(row.rr + '（' + row.value + '）的指定检测IP格式不正确', {icon:2});return;
+                }
+            }
+            var data = Object.assign({}, this.set, {
+                records: rows.map(row => ({
+                    rr: row.rr,
+                    recordid: row.RecordId,
+                    main_value: row.value,
+                    recordinfo: JSON.stringify({Line:row.Line, LineName:row.LineName, TTL:row.TTL}),
+                    backup_value: row.backup_value,
+                    checkurl: row.checkurl,
+                }))
+            });
+            var ii = layer.load(2, {shade:[0.1,'#fff']});
+            $.ajax({
+                type: "POST",
+                url: "/dmonitor/task/batchadd",
+                data: data,
+                dataType: 'json',
+                success: function(data) {
+                    layer.close(ii);
+                    if(data.code == 0){
+                        layer.alert(data.msg, {icon: 1}, function(){
+                            window.location.href = '/dmonitor/task';
+                        });
+                    }else{
+                        layer.alert(data.msg, {icon: 2});
+                    }
+                },
+                error: function(data){
+                    layer.close(ii);
+                    layer.msg('服务器错误');
+                }
+            });
+        },
         submit(){
             var that=this;
             $("#taskform").data("bootstrapValidator").validate();
             if(!$("#taskform").data("bootstrapValidator").isValid()){
                 return false;
+            }
+            if(this.action != 'edit'){
+                this.submitBatch();
+                return;
             }
             var ii = layer.load(2, {shade:[0.1,'#fff']});
             $.ajax({
