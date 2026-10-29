@@ -22,11 +22,11 @@
 .dm-group .fa-globe{color:#666;margin-right:6px}
 .dm-group b{font-weight:600;margin-right:8px}
 .dm-meta{color:#555;font-size:12px;margin-right:6px}
-.dm-isp{display:inline-flex;align-items:center;gap:5px;padding:1px 9px 1px 2px;border-radius:11px;font-size:12px;font-weight:600;line-height:18px;white-space:nowrap}
-.dm-isp>i{width:18px;height:18px;border-radius:50%;color:#fff;font-style:normal;font-size:11px;line-height:18px;text-align:center}
-.dm-isp-mobile{background:#e3f1fa;color:#00578f}.dm-isp-mobile>i{background:#0072bc}
-.dm-isp-telecom{background:#e6ecf7;color:#173a7a}.dm-isp-telecom>i{background:#1e50a2}
-.dm-isp-unicom{background:#fde7e9;color:#a8000d}.dm-isp-unicom>i{background:#e60012}
+.dm-isp{display:inline-flex;align-items:center;gap:5px;padding:1px 9px 1px 6px;border-radius:11px;font-size:12px;font-weight:600;line-height:18px;white-space:nowrap}
+.dm-isp>img{height:14px;width:auto;display:block}
+.dm-isp-mobile{background:#e3f1fa;color:#00578f}
+.dm-isp-telecom{background:#e6ecf7;color:#173a7a}
+.dm-isp-unicom{background:#fde7e9;color:#a8000d}
 .dm-isp-other{background:#eceef1;color:#3d4148;padding-left:9px}
 .dm-tag{display:inline-block;margin-left:6px;padding:0 6px;border-radius:3px;font-size:12px;line-height:18px;white-space:nowrap;font-family:inherit}
 .dm-tag-red{background:#d32f2f;color:#fff}
@@ -131,11 +131,11 @@
 <script src="/static/js/bootstrap-table-page-jump-to-1.21.4.min.js"></script>
 <script src="/static/js/custom.js?v=1006"></script>
 <script>
-// 运营商标签：品牌色 + 简化标识（非官方 logo）
+// 运营商标签：品牌色 + logo，图标位于 /static/images/isp/
 const ISPS = {
-	mobile: {name: '移动', mark: '移'},
-	telecom: {name: '电信', mark: '电'},
-	unicom: {name: '联通', mark: '联'},
+	mobile: {name: '移动', logo: 'mobile.svg'},
+	telecom: {name: '电信', logo: 'telecom.svg'},
+	unicom: {name: '联通', logo: 'unicom.svg'},
 };
 const ISP_CODES = {cm: 'mobile', yd: 'mobile', ct: 'telecom', dx: 'telecom', cu: 'unicom', lt: 'unicom'};
 
@@ -165,7 +165,7 @@ function stateText(row){
 function lineTag(row){
 	var host = hostParts(row);
 	var tip = row.rr + '.' + row.domain + '（ID ' + row.id + '）\nDNS线路：' + (row.linename || '-') + '\n状态：' + stateText(row) + (row.active == 1 ? '' : '，已停止运行');
-	if(host.isp) return '<span class="dm-isp dm-isp-' + host.isp + '" title="' + esc(tip) + '"><i>' + ISPS[host.isp].mark + '</i>' + ISPS[host.isp].name + '</span>';
+	if(host.isp) return '<span class="dm-isp dm-isp-' + host.isp + '" title="' + esc(tip) + '"><img src="/static/images/isp/' + ISPS[host.isp].logo + '" alt="">' + ISPS[host.isp].name + '</span>';
 	return '<span class="dm-isp dm-isp-other" title="' + esc(tip) + '">' + esc(host.line) + '</span>';
 }
 // 当前状态标签：已暂停/检测异常为红色，已切换备用为橙色
@@ -283,6 +283,14 @@ $(document).ready(function(){
 				}
 			},
 			{
+				field: 'active',
+				title: '运行开关',
+				formatter: function(value, row, index) {
+					var checked = value == 1;
+					return '<div class="material-switch" title="' + (checked ? '运行中，点击停止' : '已停止，点击开启') + '"><input id="active' + row.id + '" type="checkbox"' + (checked ? ' checked' : '') + ' onchange="setActive(' + row.id + ',' + (checked ? 0 : 1) + ')"/><label for="active' + row.id + '" class="label-primary"></label></div>';
+				}
+			},
+			{
 				field: 'action',
 				title: '操作',
 				align: 'right',
@@ -292,7 +300,6 @@ $(document).ready(function(){
 					html += '<li><a href="/dmonitor/task/edit?id=' + row.id + '"><i class="fa fa-pencil fa-fw"></i> 修改</a></li>';
 					html += '<li><a href="/dmonitor/task/add?copy=' + row.id + '"><i class="fa fa-copy fa-fw"></i> 复制</a></li>';
 					html += '<li><a href="/record/' + row.did + '?subdomain=' + encodeURIComponent(row.rr) + '" target="_blank"><i class="fa fa-external-link fa-fw"></i> 查看解析</a></li>';
-					html += '<li><a href="javascript:setActive(' + row.id + ',' + (row.active == 1 ? 0 : 1) + ')"><i class="fa fa-power-off fa-fw"></i> ' + (row.active == 1 ? '停止运行' : '开启运行') + '</a></li>';
 					html += '<li role="separator" class="divider"></li>';
 					html += '<li><a href="javascript:delItem(\'' + row.id + '\')" class="text-danger"><i class="fa fa-trash fa-fw"></i> 删除</a></li>';
 					return html + '</ul></div>';
